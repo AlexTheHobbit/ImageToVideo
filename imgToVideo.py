@@ -61,7 +61,6 @@ def scaleAndBlur(img_file, targetWidth = 1920, targetHeight = 1080):
     cv2.destroyAllWindows()
     return final_img
 
-
 def frames_from_image(image):
     frameRate = 25
     imgDuration = 10
@@ -90,6 +89,3 @@ for file in os.listdir():
         for i in range(len(imgSequence)):
             out.write(imgSequence[i])
         out.release()
-
-
-

@@ -67,14 +67,17 @@ def frames_from_image(image):
     framesFinal = []
     for i in range(frameTotal):
         currentScale = 1 + i*0.0004
-        currentHeight = 1080 * currentScale
-        currentWidth = 1920 * currentScale
-        currentDimensions = (round(currentWidth), round(currentHeight))
-        currentFrame = cv2.resize(image, currentDimensions, interpolation=cv2.INTER_CUBIC)
-        widthOffset = round((currentWidth-1920)/2)                   
-        heightOffset = round((currentHeight-1080)/2)
 
-        croppedFrame = currentFrame[heightOffset:1080+heightOffset, widthOffset:1920+widthOffset]
+        horizontalOffset = int((currentScale - 1)*1080)
+        verticalOffset = int((currentScale - 1)*1920)
+
+        currentHeight = 1080 + horizontalOffset*2
+        currentWidth = 1920 + verticalOffset*2
+        currentDimensions = (currentWidth, currentHeight)
+
+        currentFrame = cv2.resize(image, currentDimensions, interpolation=cv2.INTER_CUBIC)
+
+        croppedFrame = currentFrame[horizontalOffset:1080+horizontalOffset, verticalOffset:1920+verticalOffset]
         framesFinal.append(croppedFrame)
     return framesFinal
 

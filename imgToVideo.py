@@ -27,7 +27,6 @@ def scaleAndBlur(img_file, targetWidth = 1920, targetHeight = 1080):
     inv_h_offset = (int(initialHeight*(targetHeight / initialHeight)//4))
 
     w_offset = ((targetWidth//2) - (initialWidth*scaleFactor//2))
-    outputData = (int(targetWidth), int(targetHeight))
     newData = (int(scaleFactor*initialWidth), int(scaleFactor*initialHeight))
     invNewData = (int(invScaleFactor*initialWidth), int(invScaleFactor*initialHeight)) 
 

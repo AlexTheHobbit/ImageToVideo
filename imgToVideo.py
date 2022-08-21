@@ -80,11 +80,12 @@ def frames_from_image(
 
 if __name__ == "__main__":
     for file in os.listdir():
-        if file.endswith(".jpg") or file.endswith(".jpeg") or file.endswith(".png") or file.endswith(".JPG") or file.endswith(".PNG"):
+        if file.endswith(".jpg") or file.endswith(".jpeg") or file.endswith(".png") or file.endswith(".JPG") or file.endswith(".PNG") or file.endswith(".jfif") or file.endswith(".webp"):
             blurredImg = scaleAndBlur(file)
             imgSequence = frames_from_image(blurredImg)
-            
-            out = cv2.VideoWriter((str(file)+'project.avi'),cv2.VideoWriter_fourcc(*'DIVX'), 25, (1920,1080))
+            shortenedName = str(file)
+            fileName = os.path.splitext(file)
+            out = cv2.VideoWriter((str(fileName[0])+'_video.mxf'),cv2.VideoWriter_fourcc(*'xdv7'), 25, (1920,1080))
 
             for i in range(len(imgSequence)):
                 out.write(imgSequence[i])

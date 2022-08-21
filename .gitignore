@@ -3,6 +3,7 @@
 *.jpeg
 *.jfif
 *.webp
+*.avi
+*.mxf
 /.idea
 /venv
-*.avi

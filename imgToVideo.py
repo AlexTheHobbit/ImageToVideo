@@ -10,23 +10,28 @@ def scaleAndBlur(img_file, targetWidth = 1920, targetHeight = 1080, targetBlur =
 
     idealRatio = targetWidth/targetHeight
     initRatio = initialWidth/initialHeight
-    
+
     #distinguishes between wide and narrow images
     if initRatio > idealRatio:
         scaleFactor = targetWidth / initialWidth
         invScaleFactor = targetHeight / initialHeight
+        limitingDimension = "Width"
     else:
         scaleFactor = targetHeight / initialHeight
         invScaleFactor = targetWidth / initialWidth
+        limitingDimension = "Height"
 
     w_offset = ((targetWidth//2) - (initialWidth*scaleFactor//2))
     newData = (int(scaleFactor*initialWidth), int(scaleFactor*initialHeight))
     invNewData = (int(invScaleFactor*initialWidth), int(invScaleFactor*initialHeight)) 
 
+    if scaleFactor > 1:        
+        scaled_img = cv2.resize(img, newData, interpolation = cv2.INTER_CUBIC)
+        inverted_scaled_img = cv2.resize(img, invNewData, interpolation = cv2.INTER_CUBIC)
+    else:
+        scaled_img = cv2.resize(img, newData, interpolation = cv2.INTER_AREA)
+        inverted_scaled_img = cv2.resize(img, invNewData, interpolation = cv2.INTER_CUBIC)
 
-    scaled_img = cv2.resize(img, newData)
-    inverted_scaled_img = cv2.resize(img, invNewData)
-    
     #changes blurred image depending on if image is wide or narrow
     if initRatio > idealRatio:
         blurred_img = cv2.GaussianBlur(inverted_scaled_img,(targetBlur,targetBlur),0)
@@ -34,7 +39,7 @@ def scaleAndBlur(img_file, targetWidth = 1920, targetHeight = 1080, targetBlur =
         blurred_img = cv2.GaussianBlur(inverted_scaled_img,(targetBlur,targetBlur),0)
 
     x_offset = int(w_offset)
-    
+
     if initRatio > idealRatio:
         y_offset = int((targetHeight//2) - (initialHeight*scaleFactor//2))
     else:

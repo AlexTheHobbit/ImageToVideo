@@ -1,7 +1,7 @@
 import os
 import cv2
 
-def scaleAndBlur(img_file, targetWidth = 1920, targetHeight = 1080):
+def scaleAndBlur(img_file, targetWidth = 1920, targetHeight = 1080, targetBlur = 195):
     img = cv2.imread(img_file)
     imgData = img.shape
 
@@ -27,11 +27,11 @@ def scaleAndBlur(img_file, targetWidth = 1920, targetHeight = 1080):
     scaled_img = cv2.resize(img, newData)
     inverted_scaled_img = cv2.resize(img, invNewData)
     
-    #unsure if works yet, changes blurred image depending on if image is wide or narrow
+    #changes blurred image depending on if image is wide or narrow
     if initRatio > idealRatio:
-        blurred_img = cv2.GaussianBlur(inverted_scaled_img,(61,61),0)
+        blurred_img = cv2.GaussianBlur(inverted_scaled_img,(targetBlur,targetBlur),0)
     else:
-        blurred_img = cv2.GaussianBlur(inverted_scaled_img,(61,61),0)
+        blurred_img = cv2.GaussianBlur(inverted_scaled_img,(targetBlur,targetBlur),0)
 
     x_offset = int(w_offset)
     

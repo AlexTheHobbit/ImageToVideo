@@ -1,5 +1,6 @@
 import os
 import cv2
+import argparse
 
 def scaleAndBlur(img_file, targetWidth = 1920, targetHeight = 1080, targetBlur = 195):
     # Input validation
@@ -101,25 +102,152 @@ def frames_from_image(
 
     return framesFinal
 
+def parse_arguments():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description='Convert images to videos with Ken Burns zoom effect',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Process images in current directory with defaults
+  python imgToVideo.py
+
+  # Specify input and output directories
+  python imgToVideo.py -i ./images -o ./videos
+
+  # Custom resolution and settings
+  python imgToVideo.py --width 3840 --height 2160 --fps 30 --duration 15
+
+  # Adjust zoom and blur
+  python imgToVideo.py --zoom 0.0006 --blur 201
+        """
+    )
+
+    parser.add_argument('-i', '--input',
+                        default='.',
+                        help='Input directory containing images (default: current directory)')
+
+    parser.add_argument('-o', '--output',
+                        default='.',
+                        help='Output directory for videos (default: current directory)')
+
+    parser.add_argument('-w', '--width',
+                        type=int,
+                        default=1920,
+                        help='Target video width in pixels (default: 1920)')
+
+    parser.add_argument('--height',
+                        type=int,
+                        default=1080,
+                        help='Target video height in pixels (default: 1080)')
+
+    parser.add_argument('--fps',
+                        type=int,
+                        default=25,
+                        help='Frame rate (frames per second) (default: 25)')
+
+    parser.add_argument('-d', '--duration',
+                        type=int,
+                        default=10,
+                        help='Video duration in seconds (default: 10)')
+
+    parser.add_argument('-z', '--zoom',
+                        type=float,
+                        default=0.0004,
+                        help='Zoom rate (0.0001-0.01) (default: 0.0004)')
+
+    parser.add_argument('-b', '--blur',
+                        type=int,
+                        default=195,
+                        help='Blur strength (must be odd number) (default: 195)')
+
+    parser.add_argument('--codec',
+                        default='xdv7',
+                        help='Video codec fourcc code (default: xdv7 for MXF)')
+
+    parser.add_argument('--extension',
+                        default='mxf',
+                        help='Output video file extension (default: mxf)')
+
+    return parser.parse_args()
+
 if __name__ == "__main__":
+    # Parse command-line arguments
+    args = parse_arguments()
+
     # Supported image formats
     SUPPORTED_FORMATS = {'.jpg', '.jpeg', '.png', '.jfif', '.webp'}
 
-    for file in os.listdir():
+    # Validate and create output directory if needed
+    if not os.path.exists(args.input):
+        print(f"✗ Error: Input directory '{args.input}' does not exist")
+        exit(1)
+
+    if not os.path.exists(args.output):
+        try:
+            os.makedirs(args.output)
+            print(f"Created output directory: {args.output}")
+        except Exception as e:
+            print(f"✗ Error creating output directory '{args.output}': {e}")
+            exit(1)
+
+    # Get list of image files
+    image_files = []
+    for file in os.listdir(args.input):
+        file_ext = os.path.splitext(file)[1].lower()
+        if file_ext in SUPPORTED_FORMATS:
+            image_files.append(file)
+
+    if not image_files:
+        print(f"✗ No supported image files found in '{args.input}'")
+        print(f"Supported formats: {', '.join(SUPPORTED_FORMATS)}")
+        exit(0)
+
+    print(f"Found {len(image_files)} image(s) to process")
+    print(f"Settings: {args.width}x{args.height}, {args.fps}fps, {args.duration}s, zoom={args.zoom}, blur={args.blur}")
+    print()
+
+    # Process each image file
+    success_count = 0
+    error_count = 0
+
+    for file in image_files:
         # Check if file has a supported image extension (case-insensitive)
         file_ext = os.path.splitext(file)[1].lower()
         if file_ext in SUPPORTED_FORMATS:
             try:
                 print(f"Processing: {file}")
 
+                # Build full input path
+                input_path = os.path.join(args.input, file)
+
                 # Process image and generate frames
-                blurredImg = scaleAndBlur(file)
-                imgSequence = frames_from_image(blurredImg)
+                blurredImg = scaleAndBlur(
+                    input_path,
+                    targetWidth=args.width,
+                    targetHeight=args.height,
+                    targetBlur=args.blur
+                )
+                imgSequence = frames_from_image(
+                    blurredImg,
+                    frameRate=args.fps,
+                    imgDuration=args.duration,
+                    zoomRate=args.zoom,
+                    targetWidth=args.width,
+                    targetHeight=args.height
+                )
 
                 # Setup video writer
                 fileName = os.path.splitext(file)
-                outputPath = str(fileName[0]) + '_video.mxf'
-                out = cv2.VideoWriter(outputPath, cv2.VideoWriter_fourcc(*'xdv7'), 25, (1920,1080))
+                output_filename = f"{fileName[0]}_video.{args.extension}"
+                outputPath = os.path.join(args.output, output_filename)
+
+                out = cv2.VideoWriter(
+                    outputPath,
+                    cv2.VideoWriter_fourcc(*args.codec),
+                    args.fps,
+                    (args.width, args.height)
+                )
 
                 if not out.isOpened():
                     raise RuntimeError(f"Failed to initialize video writer for {outputPath}. Check codec availability.")
@@ -130,13 +258,23 @@ if __name__ == "__main__":
 
                 out.release()
                 print(f"✓ Successfully created: {outputPath}")
+                success_count += 1
 
             except ValueError as e:
                 print(f"✗ Error processing {file}: {e}")
+                error_count += 1
                 continue
             except RuntimeError as e:
                 print(f"✗ Error creating video for {file}: {e}")
+                error_count += 1
                 continue
             except Exception as e:
                 print(f"✗ Unexpected error processing {file}: {e}")
+                error_count += 1
                 continue
+
+    # Print summary
+    print()
+    print("=" * 50)
+    print(f"Processing complete: {success_count} succeeded, {error_count} failed")
+    print("=" * 50)

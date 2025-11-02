@@ -1,4 +1,5 @@
 import os
+import shutil
 import cv2
 import argparse
 from tqdm import tqdm
@@ -492,6 +493,53 @@ if __name__ == "__main__":
             print("[OK]")
         log_verbose("Codec validation successful")
         log_info("")
+
+    # Check disk space before processing
+    log_verbose("Checking available disk space")
+    try:
+        disk_usage = shutil.disk_usage(args.output)
+        available_gb = disk_usage.free / (1024**3)
+
+        # Estimate required space
+        # Conservative estimate: ~0.5 MB per frame for high quality codecs
+        frames_per_video = args.fps * args.duration
+        estimated_mb_per_frame = 0.5
+        estimated_mb_per_video = frames_per_video * estimated_mb_per_frame
+
+        # Account for files that might be skipped (resume capability)
+        files_to_process = len(image_files)
+        if not args.force:
+            # Quick check for existing outputs
+            existing_count = 0
+            for file in image_files:
+                fileName = os.path.splitext(file)
+                output_filename = f"{fileName[0]}_video.{args.extension}"
+                outputPath = os.path.join(args.output, output_filename)
+                if os.path.exists(outputPath):
+                    existing_count += 1
+            files_to_process = len(image_files) - existing_count
+
+        total_estimated_mb = files_to_process * estimated_mb_per_video
+        total_estimated_gb = total_estimated_mb / 1024
+
+        log_verbose(f"Available disk space: {available_gb:.2f} GB")
+        log_verbose(f"Estimated required space: {total_estimated_gb:.2f} GB ({files_to_process} videos)")
+
+        # Warn if less than 2x required space (safety margin)
+        if available_gb < total_estimated_gb * 2:
+            log_error(f"[WARNING] Low disk space: {available_gb:.2f} GB available, ~{total_estimated_gb:.2f} GB estimated needed")
+            log_error(f"Processing may fail if space is insufficient. Consider freeing up space.")
+            log_info("")
+        elif available_gb < total_estimated_gb:
+            log_error(f"[ERROR] Insufficient disk space: {available_gb:.2f} GB available, ~{total_estimated_gb:.2f} GB needed")
+            log_error(f"Free up disk space or process fewer images.")
+            exit(1)
+        else:
+            log_verbose("Disk space check passed")
+
+    except Exception as e:
+        log_verbose(f"Could not check disk space: {e}")
+        # Don't fail - continue anyway
 
     # Dry-run mode: preview what would be processed
     if args.dry_run:

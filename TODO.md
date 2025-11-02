@@ -38,10 +38,12 @@ This document tracks planned improvements for the Image to Video Converter proje
   - Consider using `typing.Optional` where needed
 
 ### User Experience
-- [ ] **Add progress indicators** - Show processing progress to users
-  - Use `tqdm` library for progress bars
-  - Track: frame generation, video writing, batch processing
-  - Example: "Processing image 3/10: Generating frames [████████░░] 80%"
+- [x] **Add progress indicators** - Show processing progress to users
+  - ✓ Added `tqdm` library for progress bars
+  - ✓ Tracks: frame generation (per image), batch processing (overall)
+  - ✓ Shows: percentage, frame rate, estimated time remaining
+  - ✓ Uses `tqdm.write()` for log messages to prevent interference
+  - Example output: "Processing images: 60%|######| 3/5 [00:01<00:01, 1.84image/s]"
 
 - [ ] **Improve error messages** - User-friendly errors with solutions
   - Replace technical OpenCV errors with helpful guidance

@@ -1,6 +1,7 @@
 import os
 import cv2
 import argparse
+from tqdm import tqdm
 
 def scaleAndBlur(img_file, targetWidth = 1920, targetHeight = 1080, targetBlur = 195):
     # Input validation
@@ -68,6 +69,7 @@ def frames_from_image(
     zoomRate = 0.0004,
     targetWidth = 1920,
     targetHeight = 1080,
+    show_progress = True,
 ):
     # Input validation
     if frameRate <= 0:
@@ -84,7 +86,12 @@ def frames_from_image(
 
     frameTotal = frameRate * imgDuration
 
-    for i in range(frameTotal):
+    # Create progress bar for frame generation if enabled
+    iterator = range(frameTotal)
+    if show_progress:
+        iterator = tqdm(iterator, desc="  Generating frames", unit="frame", leave=False)
+
+    for i in iterator:
         currentScale = 1 + i*zoomRate
 
         horizontalOffset = int((currentScale - 1)*targetHeight)
@@ -333,12 +340,12 @@ if __name__ == "__main__":
     success_count = 0
     error_count = 0
 
-    for file in image_files:
+    for file in tqdm(image_files, desc="Processing images", unit="image"):
         # Check if file has a supported image extension (case-insensitive)
         file_ext = os.path.splitext(file)[1].lower()
         if file_ext in SUPPORTED_FORMATS:
             try:
-                print(f"Processing: {file}")
+                tqdm.write(f"Processing: {file}")
 
                 # Build full input path
                 input_path = os.path.join(args.input, file)
@@ -379,19 +386,19 @@ if __name__ == "__main__":
                     out.write(frame)
 
                 out.release()
-                print(f"[OK] Successfully created: {outputPath}")
+                tqdm.write(f"[OK] Successfully created: {outputPath}")
                 success_count += 1
 
             except ValueError as e:
-                print(f"[ERROR] Error processing {file}: {e}")
+                tqdm.write(f"[ERROR] Error processing {file}: {e}")
                 error_count += 1
                 continue
             except RuntimeError as e:
-                print(f"[ERROR] Error creating video for {file}: {e}")
+                tqdm.write(f"[ERROR] Error creating video for {file}: {e}")
                 error_count += 1
                 continue
             except Exception as e:
-                print(f"[ERROR] Unexpected error processing {file}: {e}")
+                tqdm.write(f"[ERROR] Unexpected error processing {file}: {e}")
                 error_count += 1
                 continue
 

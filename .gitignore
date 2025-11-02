@@ -8,6 +8,7 @@
 *.mp4
 /.idea
 /venv
+/.venv
 imgToVideo.spec
 build/imgToVideo/Analysis-00.toc
 build/imgToVideo/base_library.zip

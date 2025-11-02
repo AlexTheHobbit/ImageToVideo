@@ -1,0 +1,12 @@
+[project]
+name = "image-to-video-converter"
+version = "1.0.0"
+description = "Convert images to videos with Ken Burns zoom effect"
+requires-python = ">=3.8"
+dependencies = [
+    "opencv-python==4.6.0.66",
+    "numpy<2.0",
+]
+
+[dependency-groups]
+dev = []

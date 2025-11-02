@@ -27,15 +27,19 @@ This document tracks planned improvements for the Image to Video Converter proje
   - Troubleshooting guide
   - Sample outputs
 
-- [ ] **Add comprehensive docstrings** - Document all functions
-  - `scaleAndBlur()` - Explain Ken Burns effect implementation
-  - `frames_from_image()` - Document zoom algorithm and parameters
-  - Include parameter types, return values, and exceptions
+- [x] **Add comprehensive docstrings** - Document all functions
+  - ✓ `scaleAndBlur()` - Explains Ken Burns effect foundation, aspect ratio handling, interpolation methods
+  - ✓ `frames_from_image()` - Documents zoom algorithm, memory efficiency, performance metrics
+  - ✓ `validate_codec()` - Already documented
+  - ✓ `get_codec_suggestions()` - Already documented
+  - ✓ Includes parameter types, return values, exceptions, and usage examples
 
-- [ ] **Add type hints** - Improve code clarity and enable static analysis
-  - Add type hints to all function signatures
-  - Use `numpy.ndarray`, `int`, `float`, `str` types appropriately
-  - Consider using `typing.Optional` where needed
+- [x] **Add type hints** - Improve code clarity and enable static analysis
+  - ✓ Added type hints to all function signatures
+  - ✓ Uses `numpy.ndarray`, `int`, `float`, `str`, `bool` types
+  - ✓ Uses `Generator[np.ndarray, None, None]` for frame generator
+  - ✓ Uses `List[Tuple[str, str]]` for codec suggestions
+  - ✓ Imported from `typing`: `Generator`, `List`, `Tuple`
 
 ### User Experience
 - [x] **Add progress indicators** - Show processing progress to users

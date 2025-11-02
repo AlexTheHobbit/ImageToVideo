@@ -368,6 +368,10 @@ Examples:
                         action='store_true',
                         help='Enable quiet mode (errors only, no progress bars)')
 
+    parser.add_argument('--force',
+                        action='store_true',
+                        help='Force reprocessing of existing output files (default: skip existing)')
+
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -488,6 +492,25 @@ if __name__ == "__main__":
                 input_path = os.path.join(args.input, file)
                 log_verbose(f"Input path: {input_path}")
 
+                # Determine output path early to check if it exists
+                fileName = os.path.splitext(file)
+                output_filename = f"{fileName[0]}_video.{args.extension}"
+                outputPath = os.path.join(args.output, output_filename)
+
+                # Check if output already exists (resume capability)
+                if os.path.exists(outputPath) and not args.force:
+                    msg = f"[SKIP] Output already exists: {outputPath}"
+                    if args.quiet:
+                        pass  # No output in quiet mode
+                    elif args.verbose:
+                        print(msg)
+                    else:
+                        tqdm.write(msg)
+                    log_verbose("Use --force to reprocess existing files")
+                    continue
+
+                log_verbose(f"Output path: {outputPath}")
+
                 # Process image and generate frames
                 log_verbose(f"Scaling and blurring image with {args.blur}px kernel")
                 blurredImg = scaleAndBlur(
@@ -510,11 +533,6 @@ if __name__ == "__main__":
                 )
 
                 # Setup video writer
-                fileName = os.path.splitext(file)
-                output_filename = f"{fileName[0]}_video.{args.extension}"
-                outputPath = os.path.join(args.output, output_filename)
-                log_verbose(f"Output path: {outputPath}")
-
                 log_verbose(f"Initializing VideoWriter with codec '{args.codec}'")
                 out = cv2.VideoWriter(
                     outputPath,

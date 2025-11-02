@@ -99,6 +99,106 @@ def frames_from_image(
         croppedFrame = currentFrame[horizontalOffset:targetHeight+horizontalOffset, verticalOffset:targetWidth+verticalOffset]
         yield croppedFrame
 
+def validate_codec(codec, width=1920, height=1080, fps=25, extension='avi'):
+    """
+    Validate if a video codec is available on the system.
+
+    Args:
+        codec: FourCC codec code (e.g., 'mp4v', 'avc1', 'xdv7')
+        width: Test video width
+        height: Test video height
+        fps: Test frame rate
+        extension: File extension to use for test (default 'avi')
+
+    Returns:
+        bool: True if codec is available, False otherwise
+    """
+    import tempfile
+    import sys
+    import io
+
+    # Create a temporary file to test codec with proper video extension
+    with tempfile.NamedTemporaryFile(suffix=f'.{extension}', delete=False) as tmp_file:
+        tmp_path = tmp_file.name
+
+    # Capture stderr to detect OpenCV warnings
+    old_stderr = sys.stderr
+    sys.stderr = io.StringIO()
+
+    try:
+        # Try to create VideoWriter with the codec
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+        test_writer = cv2.VideoWriter(tmp_path, fourcc, fps, (width, height))
+
+        # Check if it opened successfully
+        if not test_writer.isOpened():
+            test_writer.release()
+            return False
+
+        # Create a test frame and try to write it
+        # This catches codecs that open but can't actually encode
+        import numpy as np
+        test_frame = np.zeros((height, width, 3), dtype=np.uint8)
+        success = test_writer.write(test_frame)
+        test_writer.release()
+
+        # Check for OpenCV errors in stderr
+        stderr_output = sys.stderr.getvalue()
+        if 'tag' in stderr_output.lower() and 'not found' in stderr_output.lower():
+            return False
+        if 'unknown' in stderr_output.lower() and 'codec' in stderr_output.lower():
+            return False
+
+        # Verify the file was created and has reasonable content
+        # A valid video file should be at least a few hundred bytes
+        if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 100:
+            return True
+        return False
+    except Exception:
+        return False
+    finally:
+        # Restore stderr
+        sys.stderr = old_stderr
+        # Clean up temporary file
+        try:
+            os.remove(tmp_path)
+        except:
+            pass
+
+def get_codec_suggestions(extension='mp4'):
+    """
+    Get suggested codec alternatives based on file extension.
+
+    Args:
+        extension: Output file extension (e.g., 'mp4', 'avi', 'mxf')
+
+    Returns:
+        list: List of (codec, description) tuples
+    """
+    codec_suggestions = {
+        'mp4': [
+            ('mp4v', 'MPEG-4 Part 2 - widely compatible'),
+            ('avc1', 'H.264/AVC - high quality, modern'),
+            ('x264', 'H.264 variant - good compression'),
+        ],
+        'avi': [
+            ('xvid', 'Xvid - good quality and compression'),
+            ('mjpg', 'Motion JPEG - good compatibility'),
+            ('divx', 'DivX - good compression'),
+        ],
+        'mxf': [
+            ('xdv7', 'XDCAM HD 1080p - professional'),
+            ('mp4v', 'MPEG-4 fallback for MXF'),
+        ],
+        'mkv': [
+            ('x264', 'H.264 - excellent quality'),
+            ('xvid', 'Xvid - good compatibility'),
+        ],
+    }
+
+    # Return suggestions for the extension, or default MP4 suggestions
+    return codec_suggestions.get(extension.lower(), codec_suggestions['mp4'])
+
 def parse_arguments():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -203,6 +303,31 @@ if __name__ == "__main__":
     print(f"Found {len(image_files)} image(s) to process")
     print(f"Settings: {args.width}x{args.height}, {args.fps}fps, {args.duration}s, zoom={args.zoom}, blur={args.blur}")
     print()
+
+    # Validate codec availability before processing
+    print(f"Validating codec '{args.codec}'...", end=' ')
+    if not validate_codec(args.codec, args.width, args.height, args.fps, args.extension):
+        print("[FAILED]")
+        print()
+        print(f"[ERROR] Codec '{args.codec}' is not available on your system.")
+        print()
+        print("Suggested alternatives for .{} files:".format(args.extension))
+
+        suggestions = get_codec_suggestions(args.extension)
+        for codec, description in suggestions:
+            # Test each suggestion
+            if validate_codec(codec, args.width, args.height, args.fps, args.extension):
+                print(f"  - {codec:6s} [{description}] - AVAILABLE")
+            else:
+                print(f"  - {codec:6s} [{description}]")
+
+        print()
+        print("To use a different codec, run with: --codec <codec_name> --extension <ext>")
+        print("Example: --codec mp4v --extension mp4")
+        exit(1)
+    else:
+        print("[OK]")
+        print()
 
     # Process each image file
     success_count = 0

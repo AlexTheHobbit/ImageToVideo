@@ -14,10 +14,11 @@ This document tracks planned improvements for the Image to Video Converter proje
   - Solution: Converted to generator pattern that yields frames one at a time
   - Bonus fix: Replaced Unicode symbols (✓/✗) with ASCII [OK]/[ERROR] for Windows compatibility
 
-- [ ] **Add codec validation** - Pre-validate codec availability before processing
-  - Current issue: Invalid codecs cause cryptic errors after processing
-  - Location: Line 247 in VideoWriter initialization
-  - Solution: Check codec availability, provide fallback suggestions
+- [x] **Add codec validation** - Pre-validate codec availability before processing
+  - ~~Current issue~~ FIXED: Invalid codecs cause cryptic errors after processing
+  - Location: New functions `validate_codec()` and `get_codec_suggestions()` at lines 102-172
+  - Solution: Test codec with temporary file before processing, provide codec suggestions
+  - Features: Tests codec by writing a frame, lists AVAILABLE alternatives, helpful error messages
 
 ### Documentation
 - [x] **Create README.md** - Comprehensive user documentation

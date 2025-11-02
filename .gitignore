@@ -29,3 +29,10 @@ build/imgToVideo/localpycs/pyimod03_ctypes.pyc
 build/imgToVideo/localpycs/struct.pyc
 dist/imgToVideo.exe
 .claude/settings.local.json
+
+# Testing artifacts
+htmlcov/
+.coverage
+.pytest_cache/
+*.pyc
+__pycache__/

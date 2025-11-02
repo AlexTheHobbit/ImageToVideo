@@ -1,0 +1,27 @@
+[run]
+# Coverage configuration
+source = .
+omit =
+    tests/*
+    setup.py
+    */__pycache__/*
+    */site-packages/*
+
+[report]
+# Reporting options
+precision = 2
+show_missing = True
+skip_covered = False
+
+exclude_lines =
+    # Standard exclusions
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+
+[html]
+directory = htmlcov

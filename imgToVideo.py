@@ -6,6 +6,20 @@ from tqdm import tqdm
 from typing import Generator, List, Tuple
 import numpy as np
 
+# Constants
+# Video codec validation
+MIN_VALID_VIDEO_FILE_SIZE_BYTES = 100  # Minimum file size for a valid video file
+
+# Image processing
+BGR_COLOR_CHANNELS = 3  # Number of color channels in BGR format
+
+# Disk space estimation
+BYTES_TO_GB = 1024**3  # Conversion factor from bytes to gigabytes
+MB_TO_GB = 1024  # Conversion factor from megabytes to gigabytes
+ESTIMATED_MB_PER_FRAME_DISK_CHECK = 0.5  # Conservative estimate for disk space check
+ESTIMATED_MB_PER_FRAME_DRY_RUN = 0.1  # Conservative estimate for dry-run preview
+DISK_SPACE_SAFETY_MARGIN = 2  # Warn if available space is less than this multiple of required space
+
 def scaleAndBlur(img_file: str, targetWidth: int = 1920, targetHeight: int = 1080, targetBlur: int = 195) -> np.ndarray:
     """
     Scale an image to target dimensions and create an artistic blurred background.
@@ -233,7 +247,7 @@ def validate_codec(codec: str, width: int = 1920, height: int = 1080, fps: int =
         # Create a test frame and try to write it
         # This catches codecs that open but can't actually encode
         import numpy as np
-        test_frame = np.zeros((height, width, 3), dtype=np.uint8)
+        test_frame = np.zeros((height, width, BGR_COLOR_CHANNELS), dtype=np.uint8)
         success = test_writer.write(test_frame)
         test_writer.release()
 
@@ -246,7 +260,7 @@ def validate_codec(codec: str, width: int = 1920, height: int = 1080, fps: int =
 
         # Verify the file was created and has reasonable content
         # A valid video file should be at least a few hundred bytes
-        if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 100:
+        if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > MIN_VALID_VIDEO_FILE_SIZE_BYTES:
             return True
         return False
     except Exception:
@@ -498,12 +512,12 @@ if __name__ == "__main__":
     log_verbose("Checking available disk space")
     try:
         disk_usage = shutil.disk_usage(args.output)
-        available_gb = disk_usage.free / (1024**3)
+        available_gb = disk_usage.free / BYTES_TO_GB
 
         # Estimate required space
         # Conservative estimate: ~0.5 MB per frame for high quality codecs
         frames_per_video = args.fps * args.duration
-        estimated_mb_per_frame = 0.5
+        estimated_mb_per_frame = ESTIMATED_MB_PER_FRAME_DISK_CHECK
         estimated_mb_per_video = frames_per_video * estimated_mb_per_frame
 
         # Account for files that might be skipped (resume capability)
@@ -520,13 +534,13 @@ if __name__ == "__main__":
             files_to_process = len(image_files) - existing_count
 
         total_estimated_mb = files_to_process * estimated_mb_per_video
-        total_estimated_gb = total_estimated_mb / 1024
+        total_estimated_gb = total_estimated_mb / MB_TO_GB
 
         log_verbose(f"Available disk space: {available_gb:.2f} GB")
         log_verbose(f"Estimated required space: {total_estimated_gb:.2f} GB ({files_to_process} videos)")
 
         # Warn if less than 2x required space (safety margin)
-        if available_gb < total_estimated_gb * 2:
+        if available_gb < total_estimated_gb * DISK_SPACE_SAFETY_MARGIN:
             log_error(f"[WARNING] Low disk space: {available_gb:.2f} GB available, ~{total_estimated_gb:.2f} GB estimated needed")
             log_error(f"Processing may fail if space is insufficient. Consider freeing up space.")
             log_info("")
@@ -577,7 +591,7 @@ if __name__ == "__main__":
         total_frames = args.fps * args.duration * len(would_process)
         # Rough estimate: 1 frame @ 1080p ≈ 8MB uncompressed, varies greatly by codec
         # For compressed video, estimate ~100KB per frame for MP4V, ~50KB for H264
-        estimated_mb_per_frame = 0.1  # Conservative estimate for compressed video
+        estimated_mb_per_frame = ESTIMATED_MB_PER_FRAME_DRY_RUN  # Conservative estimate for compressed video
         estimated_total_mb = total_frames * estimated_mb_per_frame
 
         log_info("Estimated output:")

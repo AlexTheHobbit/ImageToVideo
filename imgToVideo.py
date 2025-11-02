@@ -372,6 +372,10 @@ Examples:
                         action='store_true',
                         help='Force reprocessing of existing output files (default: skip existing)')
 
+    parser.add_argument('--dry-run',
+                        action='store_true',
+                        help='Preview what would be processed without actually creating videos')
+
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -467,6 +471,55 @@ if __name__ == "__main__":
             print("[OK]")
         log_verbose("Codec validation successful")
         log_info("")
+
+    # Dry-run mode: preview what would be processed
+    if args.dry_run:
+        log_info("=== DRY RUN MODE ===")
+        log_info("The following files would be processed:\n")
+
+        would_process = []
+        would_skip = []
+
+        for file in image_files:
+            fileName = os.path.splitext(file)
+            output_filename = f"{fileName[0]}_video.{args.extension}"
+            outputPath = os.path.join(args.output, output_filename)
+
+            if os.path.exists(outputPath) and not args.force:
+                would_skip.append((file, outputPath))
+            else:
+                would_process.append((file, outputPath))
+
+        # Show files that would be processed
+        if would_process:
+            log_info(f"Would process {len(would_process)} file(s):")
+            for input_file, output_file in would_process:
+                log_info(f"  {input_file} -> {output_file}")
+            log_info("")
+
+        # Show files that would be skipped
+        if would_skip:
+            log_info(f"Would skip {len(would_skip)} existing file(s):")
+            for input_file, output_file in would_skip:
+                log_info(f"  {input_file} (output exists: {output_file})")
+            log_info("")
+
+        # Estimate output size
+        total_frames = args.fps * args.duration * len(would_process)
+        # Rough estimate: 1 frame @ 1080p ≈ 8MB uncompressed, varies greatly by codec
+        # For compressed video, estimate ~100KB per frame for MP4V, ~50KB for H264
+        estimated_mb_per_frame = 0.1  # Conservative estimate for compressed video
+        estimated_total_mb = total_frames * estimated_mb_per_frame
+
+        log_info("Estimated output:")
+        log_info(f"  Total frames: {total_frames}")
+        log_info(f"  Estimated size: ~{estimated_total_mb:.1f} MB (varies by codec and content)")
+        log_info(f"  Processing time: ~{len(would_process) * args.duration} seconds (depends on hardware)")
+        log_info("")
+
+        log_info("===================")
+        log_info("To execute, run without --dry-run flag")
+        exit(0)
 
     # Process each image file
     success_count = 0

@@ -387,6 +387,15 @@ if __name__ == "__main__":
         print("[ERROR] Cannot use both --verbose and --quiet flags simultaneously")
         exit(1)
 
+    # Validate blur parameter (must be odd for Gaussian blur)
+    if args.blur <= 0:
+        print(f"[ERROR] Blur value must be positive. Got: {args.blur}")
+        exit(1)
+    if args.blur % 2 == 0:
+        print(f"[ERROR] Blur value must be an odd number for GaussianBlur. Got: {args.blur}")
+        print(f"Try using {args.blur - 1} or {args.blur + 1} instead")
+        exit(1)
+
     # Set up verbosity helpers
     def log_info(msg: str) -> None:
         """Print informational messages (suppressed in quiet mode)."""

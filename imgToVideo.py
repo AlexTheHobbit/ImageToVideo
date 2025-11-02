@@ -2,7 +2,21 @@ import os
 import cv2
 
 def scaleAndBlur(img_file, targetWidth = 1920, targetHeight = 1080, targetBlur = 195):
+    # Input validation
+    if targetWidth <= 0 or targetHeight <= 0:
+        raise ValueError(f"Target dimensions must be positive. Got width={targetWidth}, height={targetHeight}")
+
+    if targetBlur <= 0:
+        raise ValueError(f"Target blur must be positive. Got blur={targetBlur}")
+
+    if targetBlur % 2 == 0:
+        raise ValueError(f"Target blur must be odd for GaussianBlur. Got blur={targetBlur}")
+
     img = cv2.imread(img_file)
+
+    if img is None:
+        raise ValueError(f"Failed to load image: {img_file}. File may be corrupted or not a valid image format.")
+
     imgData = img.shape
 
     initialWidth = imgData[1]
@@ -15,11 +29,9 @@ def scaleAndBlur(img_file, targetWidth = 1920, targetHeight = 1080, targetBlur =
     if initRatio > idealRatio:
         scaleFactor = targetWidth / initialWidth
         invScaleFactor = targetHeight / initialHeight
-        limitingDimension = "Width"
     else:
         scaleFactor = targetHeight / initialHeight
         invScaleFactor = targetWidth / initialWidth
-        limitingDimension = "Height"
 
     w_offset = ((targetWidth//2) - (initialWidth*scaleFactor//2))
     newData = (int(scaleFactor*initialWidth), int(scaleFactor*initialHeight))
@@ -32,11 +44,8 @@ def scaleAndBlur(img_file, targetWidth = 1920, targetHeight = 1080, targetBlur =
         scaled_img = cv2.resize(img, newData, interpolation = cv2.INTER_AREA)
         inverted_scaled_img = cv2.resize(img, invNewData, interpolation = cv2.INTER_CUBIC)
 
-    #changes blurred image depending on if image is wide or narrow
-    if initRatio > idealRatio:
-        blurred_img = cv2.GaussianBlur(inverted_scaled_img,(targetBlur,targetBlur),0)
-    else:
-        blurred_img = cv2.GaussianBlur(inverted_scaled_img,(targetBlur,targetBlur),0)
+    #apply gaussian blur to create background
+    blurred_img = cv2.GaussianBlur(inverted_scaled_img,(targetBlur,targetBlur),0)
 
     x_offset = int(w_offset)
 
@@ -45,24 +54,33 @@ def scaleAndBlur(img_file, targetWidth = 1920, targetHeight = 1080, targetBlur =
     else:
         y_offset = 0
 
-    if initRatio > idealRatio:
-        blurred_img[y_offset:y_offset+scaled_img.shape[0], x_offset:x_offset+scaled_img.shape[1]] = scaled_img
-    else:
-        blurred_img[y_offset:y_offset+scaled_img.shape[0], x_offset:x_offset+scaled_img.shape[1]] = scaled_img
+    blurred_img[y_offset:y_offset+scaled_img.shape[0], x_offset:x_offset+scaled_img.shape[1]] = scaled_img
 
     final_img = blurred_img[0:targetHeight, 0:targetWidth]
-    cv2.destroyAllWindows()
     cv2.destroyAllWindows()
     return final_img
 
 def frames_from_image(
-    image, 
+    image,
     frameRate = 25,
     imgDuration = 10,
     zoomRate = 0.0004,
     targetWidth = 1920,
     targetHeight = 1080,
 ):
+    # Input validation
+    if frameRate <= 0:
+        raise ValueError(f"Frame rate must be positive. Got frameRate={frameRate}")
+
+    if imgDuration <= 0:
+        raise ValueError(f"Image duration must be positive. Got imgDuration={imgDuration}")
+
+    if zoomRate < 0 or zoomRate > 0.1:
+        raise ValueError(f"Zoom rate must be between 0 and 0.1 for reasonable results. Got zoomRate={zoomRate}")
+
+    if targetWidth <= 0 or targetHeight <= 0:
+        raise ValueError(f"Target dimensions must be positive. Got width={targetWidth}, height={targetHeight}")
+
     frameTotal = frameRate * imgDuration
     framesFinal = []
 
@@ -84,14 +102,41 @@ def frames_from_image(
     return framesFinal
 
 if __name__ == "__main__":
-    for file in os.listdir():
-        if file.endswith(".jpg") or file.endswith(".jpeg") or file.endswith(".png") or file.endswith(".JPG") or file.endswith(".PNG") or file.endswith(".jfif") or file.endswith(".webp"):
-            blurredImg = scaleAndBlur(file)
-            imgSequence = frames_from_image(blurredImg)
-            shortenedName = str(file)
-            fileName = os.path.splitext(file)
-            out = cv2.VideoWriter((str(fileName[0])+'_video.mxf'),cv2.VideoWriter_fourcc(*'xdv7'), 25, (1920,1080))
+    # Supported image formats
+    SUPPORTED_FORMATS = {'.jpg', '.jpeg', '.png', '.jfif', '.webp'}
 
-            for i in range(len(imgSequence)):
-                out.write(imgSequence[i])
-            out.release()
+    for file in os.listdir():
+        # Check if file has a supported image extension (case-insensitive)
+        file_ext = os.path.splitext(file)[1].lower()
+        if file_ext in SUPPORTED_FORMATS:
+            try:
+                print(f"Processing: {file}")
+
+                # Process image and generate frames
+                blurredImg = scaleAndBlur(file)
+                imgSequence = frames_from_image(blurredImg)
+
+                # Setup video writer
+                fileName = os.path.splitext(file)
+                outputPath = str(fileName[0]) + '_video.mxf'
+                out = cv2.VideoWriter(outputPath, cv2.VideoWriter_fourcc(*'xdv7'), 25, (1920,1080))
+
+                if not out.isOpened():
+                    raise RuntimeError(f"Failed to initialize video writer for {outputPath}. Check codec availability.")
+
+                # Write frames to video
+                for i in range(len(imgSequence)):
+                    out.write(imgSequence[i])
+
+                out.release()
+                print(f"✓ Successfully created: {outputPath}")
+
+            except ValueError as e:
+                print(f"✗ Error processing {file}: {e}")
+                continue
+            except RuntimeError as e:
+                print(f"✗ Error creating video for {file}: {e}")
+                continue
+            except Exception as e:
+                print(f"✗ Unexpected error processing {file}: {e}")
+                continue

@@ -20,6 +20,48 @@ ESTIMATED_MB_PER_FRAME_DISK_CHECK = 0.5  # Conservative estimate for disk space 
 ESTIMATED_MB_PER_FRAME_DRY_RUN = 0.1  # Conservative estimate for dry-run preview
 DISK_SPACE_SAFETY_MARGIN = 2  # Warn if available space is less than this multiple of required space
 
+
+class VideoWriterContext:
+    """
+    Context manager for cv2.VideoWriter to ensure proper resource cleanup.
+
+    Usage:
+        with VideoWriterContext(path, fourcc, fps, (width, height)) as writer:
+            writer.write(frame)
+
+    This ensures the VideoWriter is properly released even if an exception occurs.
+    """
+
+    def __init__(self, filename: str, fourcc: int, fps: float, frameSize: Tuple[int, int], isColor: bool = True):
+        """
+        Initialize VideoWriter context manager.
+
+        Args:
+            filename: Output video file path
+            fourcc: Video codec fourcc code
+            fps: Frame rate
+            frameSize: Video dimensions as (width, height)
+            isColor: Whether the video is color (default: True)
+        """
+        self.filename = filename
+        self.fourcc = fourcc
+        self.fps = fps
+        self.frameSize = frameSize
+        self.isColor = isColor
+        self.writer = None
+
+    def __enter__(self):
+        """Create and return the VideoWriter."""
+        self.writer = cv2.VideoWriter(self.filename, self.fourcc, self.fps, self.frameSize, self.isColor)
+        return self.writer
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Ensure VideoWriter is released."""
+        if self.writer is not None:
+            self.writer.release()
+        return False  # Don't suppress exceptions
+
+
 def scaleAndBlur(img_file: str, targetWidth: int = 1920, targetHeight: int = 1080, targetBlur: int = 195) -> np.ndarray:
     """
     Scale an image to target dimensions and create an artistic blurred background.
@@ -237,19 +279,17 @@ def validate_codec(codec: str, width: int = 1920, height: int = 1080, fps: int =
     try:
         # Try to create VideoWriter with the codec
         fourcc = cv2.VideoWriter_fourcc(*codec)
-        test_writer = cv2.VideoWriter(tmp_path, fourcc, fps, (width, height))
 
-        # Check if it opened successfully
-        if not test_writer.isOpened():
-            test_writer.release()
-            return False
+        with VideoWriterContext(tmp_path, fourcc, fps, (width, height)) as test_writer:
+            # Check if it opened successfully
+            if not test_writer.isOpened():
+                return False
 
-        # Create a test frame and try to write it
-        # This catches codecs that open but can't actually encode
-        import numpy as np
-        test_frame = np.zeros((height, width, BGR_COLOR_CHANNELS), dtype=np.uint8)
-        success = test_writer.write(test_frame)
-        test_writer.release()
+            # Create a test frame and try to write it
+            # This catches codecs that open but can't actually encode
+            import numpy as np
+            test_frame = np.zeros((height, width, BGR_COLOR_CHANNELS), dtype=np.uint8)
+            success = test_writer.write(test_frame)
 
         # Check for OpenCV errors in stderr
         stderr_output = sys.stderr.getvalue()
@@ -668,24 +708,19 @@ if __name__ == "__main__":
                     show_progress=not args.quiet
                 )
 
-                # Setup video writer
+                # Setup video writer with context manager for automatic cleanup
                 log_verbose(f"Initializing VideoWriter with codec '{args.codec}'")
-                out = cv2.VideoWriter(
-                    outputPath,
-                    cv2.VideoWriter_fourcc(*args.codec),
-                    args.fps,
-                    (args.width, args.height)
-                )
+                fourcc = cv2.VideoWriter_fourcc(*args.codec)
 
-                if not out.isOpened():
-                    raise RuntimeError(f"Failed to initialize video writer for {outputPath}. Check codec availability.")
+                with VideoWriterContext(outputPath, fourcc, args.fps, (args.width, args.height)) as out:
+                    if not out.isOpened():
+                        raise RuntimeError(f"Failed to initialize video writer for {outputPath}. Check codec availability.")
 
-                # Write frames to video
-                log_verbose("Writing frames to video file")
-                for frame in imgSequence:
-                    out.write(frame)
+                    # Write frames to video
+                    log_verbose("Writing frames to video file")
+                    for frame in imgSequence:
+                        out.write(frame)
 
-                out.release()
                 log_verbose("Video file closed successfully")
 
                 # Log success

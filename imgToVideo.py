@@ -430,6 +430,18 @@ if __name__ == "__main__":
             log_error(f"[ERROR] Error creating output directory '{args.output}': {e}")
             exit(1)
 
+    # Verify output directory is writable
+    log_verbose("Verifying output directory is writable")
+    test_file = os.path.join(args.output, '.write_test_tmp')
+    try:
+        with open(test_file, 'w') as f:
+            f.write('test')
+        os.remove(test_file)
+        log_verbose("Output directory write test successful")
+    except Exception as e:
+        log_error(f"[ERROR] Output directory '{args.output}' is not writable: {e}")
+        exit(1)
+
     # Get list of image files
     log_verbose(f"Scanning for supported image formats: {', '.join(SUPPORTED_FORMATS)}")
     image_files = []

@@ -360,104 +360,162 @@ Examples:
                         default='mxf',
                         help='Output video file extension (default: mxf)')
 
+    parser.add_argument('-v', '--verbose',
+                        action='store_true',
+                        help='Enable verbose output (detailed processing information)')
+
+    parser.add_argument('-q', '--quiet',
+                        action='store_true',
+                        help='Enable quiet mode (errors only, no progress bars)')
+
     return parser.parse_args()
 
 if __name__ == "__main__":
     # Parse command-line arguments
     args = parse_arguments()
 
+    # Handle conflicting verbosity flags
+    if args.verbose and args.quiet:
+        print("[ERROR] Cannot use both --verbose and --quiet flags simultaneously")
+        exit(1)
+
+    # Set up verbosity helpers
+    def log_info(msg: str) -> None:
+        """Print informational messages (suppressed in quiet mode)."""
+        if not args.quiet:
+            print(msg)
+
+    def log_verbose(msg: str) -> None:
+        """Print verbose messages (only in verbose mode)."""
+        if args.verbose:
+            print(f"[VERBOSE] {msg}")
+
+    def log_error(msg: str) -> None:
+        """Print error messages (always shown)."""
+        print(msg)
+
     # Supported image formats
     SUPPORTED_FORMATS = {'.jpg', '.jpeg', '.png', '.jfif', '.webp'}
 
     # Validate and create output directory if needed
+    log_verbose(f"Checking input directory: {args.input}")
     if not os.path.exists(args.input):
-        print(f"[ERROR] Input directory '{args.input}' does not exist")
+        log_error(f"[ERROR] Input directory '{args.input}' does not exist")
         exit(1)
 
+    log_verbose(f"Checking output directory: {args.output}")
     if not os.path.exists(args.output):
         try:
             os.makedirs(args.output)
-            print(f"Created output directory: {args.output}")
+            log_info(f"Created output directory: {args.output}")
+            log_verbose(f"Output directory created successfully")
         except Exception as e:
-            print(f"[ERROR] Error creating output directory '{args.output}': {e}")
+            log_error(f"[ERROR] Error creating output directory '{args.output}': {e}")
             exit(1)
 
     # Get list of image files
+    log_verbose(f"Scanning for supported image formats: {', '.join(SUPPORTED_FORMATS)}")
     image_files = []
     for file in os.listdir(args.input):
         file_ext = os.path.splitext(file)[1].lower()
         if file_ext in SUPPORTED_FORMATS:
             image_files.append(file)
+            log_verbose(f"Found image: {file}")
 
     if not image_files:
-        print(f"[ERROR] No supported image files found in '{args.input}'")
-        print(f"Supported formats: {', '.join(SUPPORTED_FORMATS)}")
+        log_error(f"[ERROR] No supported image files found in '{args.input}'")
+        log_error(f"Supported formats: {', '.join(SUPPORTED_FORMATS)}")
         exit(0)
 
-    print(f"Found {len(image_files)} image(s) to process")
-    print(f"Settings: {args.width}x{args.height}, {args.fps}fps, {args.duration}s, zoom={args.zoom}, blur={args.blur}")
-    print()
+    log_info(f"Found {len(image_files)} image(s) to process")
+    log_info(f"Settings: {args.width}x{args.height}, {args.fps}fps, {args.duration}s, zoom={args.zoom}, blur={args.blur}")
+    log_verbose(f"Codec: {args.codec}, Extension: {args.extension}")
+    log_verbose(f"Expected frames per video: {args.fps * args.duration}")
+    log_info("")
 
     # Validate codec availability before processing
-    print(f"Validating codec '{args.codec}'...", end=' ')
+    log_verbose("Starting codec validation")
+    if not args.quiet:
+        print(f"Validating codec '{args.codec}'...", end=' ')
+
     if not validate_codec(args.codec, args.width, args.height, args.fps, args.extension):
-        print("[FAILED]")
-        print()
-        print(f"[ERROR] Codec '{args.codec}' is not available on your system.")
-        print()
-        print("Suggested alternatives for .{} files:".format(args.extension))
+        if not args.quiet:
+            print("[FAILED]")
+        log_error("")
+        log_error(f"[ERROR] Codec '{args.codec}' is not available on your system.")
+        log_error("")
+        log_error("Suggested alternatives for .{} files:".format(args.extension))
 
         suggestions = get_codec_suggestions(args.extension)
         for codec, description in suggestions:
             # Test each suggestion
             if validate_codec(codec, args.width, args.height, args.fps, args.extension):
-                print(f"  - {codec:6s} [{description}] - AVAILABLE")
+                log_error(f"  - {codec:6s} [{description}] - AVAILABLE")
             else:
-                print(f"  - {codec:6s} [{description}]")
+                log_error(f"  - {codec:6s} [{description}]")
 
-        print()
-        print("To use a different codec, run with: --codec <codec_name> --extension <ext>")
-        print("Example: --codec mp4v --extension mp4")
+        log_error("")
+        log_error("To use a different codec, run with: --codec <codec_name> --extension <ext>")
+        log_error("Example: --codec mp4v --extension mp4")
         exit(1)
     else:
-        print("[OK]")
-        print()
+        if not args.quiet:
+            print("[OK]")
+        log_verbose("Codec validation successful")
+        log_info("")
 
     # Process each image file
     success_count = 0
     error_count = 0
 
-    for file in tqdm(image_files, desc="Processing images", unit="image"):
+    # Set up iterator with or without progress bar based on quiet mode
+    iterator = image_files if args.quiet else tqdm(image_files, desc="Processing images", unit="image")
+
+    for file in iterator:
         # Check if file has a supported image extension (case-insensitive)
         file_ext = os.path.splitext(file)[1].lower()
         if file_ext in SUPPORTED_FORMATS:
             try:
-                tqdm.write(f"Processing: {file}")
+                # Log processing start
+                if args.quiet:
+                    pass  # No output in quiet mode
+                elif args.verbose:
+                    print(f"Processing: {file}")
+                else:
+                    tqdm.write(f"Processing: {file}")
 
                 # Build full input path
                 input_path = os.path.join(args.input, file)
+                log_verbose(f"Input path: {input_path}")
 
                 # Process image and generate frames
+                log_verbose(f"Scaling and blurring image with {args.blur}px kernel")
                 blurredImg = scaleAndBlur(
                     input_path,
                     targetWidth=args.width,
                     targetHeight=args.height,
                     targetBlur=args.blur
                 )
+                log_verbose(f"Image scaled to {args.width}x{args.height}")
+
+                log_verbose(f"Generating {args.fps * args.duration} frames")
                 imgSequence = frames_from_image(
                     blurredImg,
                     frameRate=args.fps,
                     imgDuration=args.duration,
                     zoomRate=args.zoom,
                     targetWidth=args.width,
-                    targetHeight=args.height
+                    targetHeight=args.height,
+                    show_progress=not args.quiet
                 )
 
                 # Setup video writer
                 fileName = os.path.splitext(file)
                 output_filename = f"{fileName[0]}_video.{args.extension}"
                 outputPath = os.path.join(args.output, output_filename)
+                log_verbose(f"Output path: {outputPath}")
 
+                log_verbose(f"Initializing VideoWriter with codec '{args.codec}'")
                 out = cv2.VideoWriter(
                     outputPath,
                     cv2.VideoWriter_fourcc(*args.codec),
@@ -469,28 +527,58 @@ if __name__ == "__main__":
                     raise RuntimeError(f"Failed to initialize video writer for {outputPath}. Check codec availability.")
 
                 # Write frames to video
+                log_verbose("Writing frames to video file")
                 for frame in imgSequence:
                     out.write(frame)
 
                 out.release()
-                tqdm.write(f"[OK] Successfully created: {outputPath}")
+                log_verbose("Video file closed successfully")
+
+                # Log success
+                if args.quiet:
+                    pass  # No output in quiet mode
+                elif args.verbose:
+                    print(f"[OK] Successfully created: {outputPath}")
+                else:
+                    tqdm.write(f"[OK] Successfully created: {outputPath}")
                 success_count += 1
 
             except ValueError as e:
-                tqdm.write(f"[ERROR] Error processing {file}: {e}")
+                msg = f"[ERROR] Error processing {file}: {e}"
+                if args.quiet:
+                    log_error(msg)
+                elif args.verbose:
+                    print(msg)
+                else:
+                    tqdm.write(msg)
                 error_count += 1
                 continue
             except RuntimeError as e:
-                tqdm.write(f"[ERROR] Error creating video for {file}: {e}")
+                msg = f"[ERROR] Error creating video for {file}: {e}"
+                if args.quiet:
+                    log_error(msg)
+                elif args.verbose:
+                    print(msg)
+                else:
+                    tqdm.write(msg)
                 error_count += 1
                 continue
             except Exception as e:
-                tqdm.write(f"[ERROR] Unexpected error processing {file}: {e}")
+                msg = f"[ERROR] Unexpected error processing {file}: {e}"
+                if args.quiet:
+                    log_error(msg)
+                elif args.verbose:
+                    print(msg)
+                else:
+                    tqdm.write(msg)
                 error_count += 1
                 continue
 
     # Print summary
-    print()
-    print("=" * 50)
-    print(f"Processing complete: {success_count} succeeded, {error_count} failed")
-    print("=" * 50)
+    log_info("")
+    log_info("=" * 50)
+    log_info(f"Processing complete: {success_count} succeeded, {error_count} failed")
+    log_verbose(f"Total images processed: {success_count + error_count}")
+    if error_count > 0:
+        log_verbose(f"Success rate: {success_count / (success_count + error_count) * 100:.1f}%")
+    log_info("=" * 50)

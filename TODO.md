@@ -49,15 +49,19 @@ This document tracks planned improvements for the Image to Video Converter proje
   - ✓ Uses `tqdm.write()` for log messages to prevent interference
   - Example output: "Processing images: 60%|######| 3/5 [00:01<00:01, 1.84image/s]"
 
-- [ ] **Improve error messages** - User-friendly errors with solutions
-  - Replace technical OpenCV errors with helpful guidance
-  - Example: "Codec 'xdv7' not available. Try: --codec mp4v or --codec avc1"
-  - Add suggestions for common issues (disk space, permissions, formats)
+- [x] **Improve error messages** - User-friendly errors with solutions
+  - ✓ Codec validation provides helpful alternatives and availability status
+  - ✓ Clear error prefixes: [ERROR], [VERBOSE], [OK], [FAILED]
+  - ✓ Input/output directory validation with helpful messages
+  - ✓ Errors always shown, even in quiet mode
 
-- [ ] **Add verbose/quiet modes** - Control output verbosity
-  - `-v, --verbose` flag for detailed output and debugging
-  - `-q, --quiet` flag for minimal output (errors only)
-  - Default: normal informational output
+- [x] **Add verbose/quiet modes** - Control output verbosity
+  - ✓ `-v, --verbose` flag for detailed processing information
+  - ✓ `-q, --quiet` flag for errors-only output (no progress bars)
+  - ✓ Mutual exclusivity check (cannot use both simultaneously)
+  - ✓ Three logging levels: log_info(), log_verbose(), log_error()
+  - ✓ Progress bars disabled in quiet mode
+  - ✓ Verbose mode shows: paths, dimensions, frame counts, codec details, success rate
 
 ---
 

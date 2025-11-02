@@ -133,101 +133,136 @@ iterator = items if args.quiet else tqdm(items, desc="Processing", unit="item")
 
 ## Development Roadmap
 
-### Phase 1: Quick Wins & Critical Fixes ✅ COMPLETE
-All Phase 1 items have been implemented:
+### Phase 1: Testing & Validation Foundation
+**Goal**: Establish a robust testing infrastructure
 
-**Critical Fixes**:
-- ✅ Memory management - Converted to generator pattern (99% memory reduction)
-- ✅ Codec validation - Pre-flight checks with helpful suggestions
+- [ ] Create unit tests for core functions
+  - [ ] `scaleAndBlur()` - test aspect ratio handling, blur validation
+  - [ ] `frames_from_image()` - test generator pattern, zoom calculations
+  - [ ] `validate_codec()` - test various codec scenarios
+  - [ ] `get_codec_suggestions()` - test suggestion accuracy
+- [ ] Add integration tests for full processing pipeline
+  - [ ] Test processing single image end-to-end
+  - [ ] Test batch processing with multiple images
+  - [ ] Test resume capability (skip existing files)
+- [ ] Implement output video validation
+  - [ ] Verify output file exists and has content
+  - [ ] Check video metadata (duration, fps, resolution)
+  - [ ] Validate frame count matches expected
+- [ ] Add test fixtures and sample images
+  - [ ] Wide (landscape) test image
+  - [ ] Narrow (portrait) test image
+  - [ ] Square test image
+  - [ ] Edge cases (very small, very large)
 
-**Documentation**:
-- ✅ README.md - Comprehensive user documentation
-- ✅ Comprehensive docstrings - All functions documented with examples
-- ✅ Type hints - Complete type annotations throughout
+### Phase 2: User Experience & Features
+**Goal**: Make the tool more user-friendly and capable
 
-**User Experience**:
-- ✅ Progress indicators - tqdm progress bars for batch and frame generation
-- ✅ Improved error messages - Clear prefixes and helpful solutions
-- ✅ Verbose/quiet modes - Three-level logging system
+- [ ] Add configuration file support
+  - [ ] Allow `.imgtovideorc` or `config.yaml` for defaults
+  - [ ] Support per-project configuration
+  - [ ] Document configuration options
+- [ ] Implement pan effects alongside zoom
+  - [ ] Add `--pan-direction` argument (left, right, up, down)
+  - [ ] Support combined zoom + pan
+  - [ ] Add random pan option for variation
+- [ ] Add audio support
+  - [ ] Allow background music/audio file
+  - [ ] Support audio fade in/out
+  - [ ] Match audio duration to video
+- [ ] Improve error messages and recovery
+  - [ ] Better suggestions when codec fails
+  - [ ] Graceful handling of corrupted images
+  - [ ] Retry logic for transient failures
+- [ ] Add more output options
+  - [ ] Support for preset quality levels (low, medium, high, ultra)
+  - [ ] Bitrate control
+  - [ ] Compression level control
 
-### Phase 2: UX Improvements (Next Priority)
+### Phase 3: Code Quality & Architecture
+**Goal**: Improve maintainability and testability
 
-**Workflow Enhancements**:
-- [ ] **Dry-run mode** - Preview processing without execution
-  - `--dry-run` flag to show files, settings, estimated output size
+- [ ] Extract functions into logical modules
+  - [ ] `image_processing.py` - scaleAndBlur, frame generation
+  - [ ] `codec_validation.py` - codec testing and suggestions
+  - [ ] `cli.py` - argument parsing and main execution
+  - [ ] `validators.py` - input validation logic
+- [ ] Improve type hints and documentation
+  - [ ] Add type stubs for better IDE support
+  - [ ] Generate API documentation from docstrings
+  - [ ] Add more inline comments for complex logic
+- [ ] Refactor VideoWriter context manager
+  - [ ] Consider using dataclasses for configuration
+  - [ ] Add more robust error handling
+- [ ] Add logging framework
+  - [ ] Replace print statements with proper logging
+  - [ ] Support log levels (DEBUG, INFO, WARNING, ERROR)
+  - [ ] Add option to write logs to file
 
-- [ ] **Preview mode** - Generate sample output
-  - `--preview` creates first/middle/last frame thumbnails or 3-second sample
+### Phase 4: Performance & Scalability
+**Goal**: Handle larger workloads efficiently
 
-- [ ] **Resume capability** - Skip already-processed files
-  - Check for existing output files
-  - `--force` to reprocess, `--skip-existing` as default
+- [ ] Implement parallel processing
+  - [ ] Process multiple images concurrently
+  - [ ] Use multiprocessing pool for CPU-bound work
+  - [ ] Add `--jobs` argument to control parallelism
+  - [ ] Maintain memory efficiency with generator pattern
+- [ ] Add GPU acceleration support
+  - [ ] Investigate CUDA/OpenCL for frame generation
+  - [ ] Benchmark GPU vs CPU performance
+  - [ ] Make GPU optional (fallback to CPU)
+- [ ] Optimize memory usage
+  - [ ] Profile memory consumption
+  - [ ] Identify and fix memory leaks
+  - [ ] Add memory usage reporting in verbose mode
+- [ ] Add caching for repeated operations
+  - [ ] Cache scaled/blurred base images
+  - [ ] Implement smart cache invalidation
 
-**Configuration**:
-- [ ] **Config file support** - YAML/JSON configuration files
-  - `--config config.yaml` to load settings
-  - CLI args override config values
-  - Presets for common scenarios (web, broadcast, social media)
+### Phase 5: Advanced Features
+**Goal**: Add professional-grade capabilities
 
-- [ ] **Logging framework** - Structured logging with Python's logging module
-  - Log levels: DEBUG, INFO, WARNING, ERROR
-  - `--log-file output.log` for persistent logs
+- [ ] Support for video sequences
+  - [ ] Accept input folders with numbered image sequences
+  - [ ] Create slideshow from multiple images
+  - [ ] Add transition effects between images
+- [ ] Add filters and effects
+  - [ ] Color grading presets (vintage, black & white, etc.)
+  - [ ] Vignette effect
+  - [ ] Film grain/noise
+- [ ] Batch processing enhancements
+  - [ ] Process entire directory tree recursively
+  - [ ] Pattern matching for selective processing
+  - [ ] Generate index/manifest of processed files
+- [ ] Export presets
+  - [ ] Instagram (1080x1080, mp4)
+  - [ ] YouTube (1920x1080, h264)
+  - [ ] Twitter (1280x720, mp4)
+  - [ ] TikTok (1080x1920, mp4)
+- [ ] Add web interface (optional)
+  - [ ] Simple Flask/FastAPI web UI
+  - [ ] Drag-and-drop image upload
+  - [ ] Real-time preview
+  - [ ] Download processed videos
 
-**Validation & Safety**:
-- [ ] **Disk space validation** - Check before processing
-- [ ] **Output validation** - Verify created videos are valid
-- [ ] **Better CLI validation** - Validate blur at parse time, check paths early
+### Phase 6: Distribution & Deployment
+**Goal**: Make the tool easy to install and use
 
-### Phase 3: Code Quality
-
-**Testing**:
-- [ ] Create test structure (tests/, pytest.ini, conftest.py, fixtures/)
-- [ ] Unit tests for `scaleAndBlur()` and `frames_from_image()`
-- [ ] Integration tests for end-to-end workflows
-
-**Code Cleanup**:
-- [ ] Extract magic numbers to named constants
-- [ ] Improve iteration patterns (already using direct iteration)
-- [ ] Resource cleanup with context managers for VideoWriter
-- [ ] Separate validation logic to validators module
-
-### Phase 4: Feature Expansion
-
-**Output Options**:
-- [ ] Quality presets (--quality low/medium/high/best)
-- [ ] List available codecs command
-- [ ] Metadata support (title, description, EXIF preservation)
-
-**Batch Processing**:
-- [ ] Pattern matching (--pattern "*.jpg")
-- [ ] Parallel processing (--parallel N)
-- [ ] Recursive directory processing (--recursive)
-
-**Effects**:
-- [ ] Zoom direction (in vs out)
-- [ ] Pan direction (left/right/up/down)
-
-**Refactoring**:
-- [ ] Modularize into src/ structure while maintaining backward compatibility
-
-### Future Considerations
-
-**Advanced Features**:
-- GPU acceleration (CUDA backend)
-- Slideshow mode with transitions
-- Audio support
-- Smart cropping (face detection)
-- Advanced motion curves
-
-**Distribution**:
-- PyPI package distribution
-- Entry point CLI command
-- Cross-platform CI/CD testing
-
-**Infrastructure**:
-- GitHub Actions CI/CD
-- Dependency security scanning
-- Code quality gates
+- [ ] Package for distribution
+  - [ ] Create PyPI package
+  - [ ] Add `setup.py` and proper package structure
+  - [ ] Include pre-built binaries for common platforms
+- [ ] Create standalone executables
+  - [ ] Use PyInstaller for Windows/Mac/Linux
+  - [ ] Test on clean systems without Python
+- [ ] Add Docker support
+  - [ ] Create Dockerfile for containerized usage
+  - [ ] Publish to Docker Hub
+  - [ ] Document Docker usage
+- [ ] Improve documentation
+  - [ ] Add video tutorials/demos
+  - [ ] Create comprehensive user guide
+  - [ ] Document all codec options by platform
 
 ### Development Notes
 

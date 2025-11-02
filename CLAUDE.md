@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Image to Video Converter - A single-file Python CLI tool that creates videos from static images using the Ken Burns zoom effect. The project uses OpenCV for image processing and video encoding, with a focus on memory efficiency and user experience.
+Image to Video Converter - A single-file Python CLI tool that creates videos from static images using the Ken Burns zoom effect. The project uses OpenCV for image processing and video encoding, with a focus on user experience.
 
 ## Development Setup
 

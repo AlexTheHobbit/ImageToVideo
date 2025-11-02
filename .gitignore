@@ -27,3 +27,4 @@ build/imgToVideo/localpycs/pyimod02_importers.pyc
 build/imgToVideo/localpycs/pyimod03_ctypes.pyc
 build/imgToVideo/localpycs/struct.pyc
 dist/imgToVideo.exe
+.claude/settings.local.json

@@ -323,14 +323,14 @@ Image to Video Converter/
 ├── uv.lock                # Locked dependencies
 ├── requirements.txt       # Pip dependencies (legacy)
 ├── README.md              # This file
-├── TODO.md                # Development roadmap
+├── CLAUDE.md              # Development guide and roadmap
 ├── .gitignore             # Git ignore rules
 └── .venv/                 # Virtual environment (uv)
 ```
 
 ## Development
 
-See [TODO.md](TODO.md) for planned improvements and development roadmap.
+See [CLAUDE.md](CLAUDE.md) for development guide and planned improvements roadmap.
 
 ### Current Version: 1.0.0
 
@@ -375,14 +375,14 @@ This project is open source. See repository for license details.
 
 Contributions are welcome! Areas for improvement:
 
-- Progress indicators during processing
 - Additional zoom and pan effects
 - Configuration file support
 - Preview mode before full processing
 - Parallel batch processing
 - More output format presets
+- Quality presets
 
-See [TODO.md](TODO.md) for detailed improvement plans.
+See [CLAUDE.md](CLAUDE.md) for the complete development roadmap with planned phases.
 
 ## Acknowledgments
 

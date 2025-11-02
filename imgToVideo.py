@@ -83,7 +83,6 @@ def frames_from_image(
         raise ValueError(f"Target dimensions must be positive. Got width={targetWidth}, height={targetHeight}")
 
     frameTotal = frameRate * imgDuration
-    framesFinal = []
 
     for i in range(frameTotal):
         currentScale = 1 + i*zoomRate
@@ -98,9 +97,7 @@ def frames_from_image(
         currentFrame = cv2.resize(image, currentDimensions, interpolation=cv2.INTER_CUBIC)
 
         croppedFrame = currentFrame[horizontalOffset:targetHeight+horizontalOffset, verticalOffset:targetWidth+verticalOffset]
-        framesFinal.append(croppedFrame)
-
-    return framesFinal
+        yield croppedFrame
 
 def parse_arguments():
     """Parse command-line arguments."""
@@ -180,7 +177,7 @@ if __name__ == "__main__":
 
     # Validate and create output directory if needed
     if not os.path.exists(args.input):
-        print(f"✗ Error: Input directory '{args.input}' does not exist")
+        print(f"[ERROR] Input directory '{args.input}' does not exist")
         exit(1)
 
     if not os.path.exists(args.output):
@@ -188,7 +185,7 @@ if __name__ == "__main__":
             os.makedirs(args.output)
             print(f"Created output directory: {args.output}")
         except Exception as e:
-            print(f"✗ Error creating output directory '{args.output}': {e}")
+            print(f"[ERROR] Error creating output directory '{args.output}': {e}")
             exit(1)
 
     # Get list of image files
@@ -199,7 +196,7 @@ if __name__ == "__main__":
             image_files.append(file)
 
     if not image_files:
-        print(f"✗ No supported image files found in '{args.input}'")
+        print(f"[ERROR] No supported image files found in '{args.input}'")
         print(f"Supported formats: {', '.join(SUPPORTED_FORMATS)}")
         exit(0)
 
@@ -253,23 +250,23 @@ if __name__ == "__main__":
                     raise RuntimeError(f"Failed to initialize video writer for {outputPath}. Check codec availability.")
 
                 # Write frames to video
-                for i in range(len(imgSequence)):
-                    out.write(imgSequence[i])
+                for frame in imgSequence:
+                    out.write(frame)
 
                 out.release()
-                print(f"✓ Successfully created: {outputPath}")
+                print(f"[OK] Successfully created: {outputPath}")
                 success_count += 1
 
             except ValueError as e:
-                print(f"✗ Error processing {file}: {e}")
+                print(f"[ERROR] Error processing {file}: {e}")
                 error_count += 1
                 continue
             except RuntimeError as e:
-                print(f"✗ Error creating video for {file}: {e}")
+                print(f"[ERROR] Error creating video for {file}: {e}")
                 error_count += 1
                 continue
             except Exception as e:
-                print(f"✗ Unexpected error processing {file}: {e}")
+                print(f"[ERROR] Unexpected error processing {file}: {e}")
                 error_count += 1
                 continue
 

@@ -8,10 +8,11 @@ This document tracks planned improvements for the Image to Video Converter proje
 **Focus**: Immediate improvements with high impact and low effort
 
 ### Critical Fixes
-- [ ] **Fix memory management issue** - Stream frames directly to VideoWriter instead of storing entire frame list in memory
-  - Current issue: High memory usage for long videos (e.g., 60s @ 30fps @ 1080p = ~14GB RAM)
-  - Location: `frames_from_image()` lines 86-101, main loop line 256
-  - Solution: Use generator pattern to yield frames one at a time
+- [x] **Fix memory management issue** - Stream frames directly to VideoWriter instead of storing entire frame list in memory
+  - ~~Current issue~~ FIXED: High memory usage for long videos (e.g., 60s @ 30fps @ 1080p = ~14GB RAM)
+  - Location: `frames_from_image()` lines 87-100, main loop line 253
+  - Solution: Converted to generator pattern that yields frames one at a time
+  - Bonus fix: Replaced Unicode symbols (✓/✗) with ASCII [OK]/[ERROR] for Windows compatibility
 
 - [ ] **Add codec validation** - Pre-validate codec availability before processing
   - Current issue: Invalid codecs cause cryptic errors after processing

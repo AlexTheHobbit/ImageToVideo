@@ -348,6 +348,128 @@ def get_codec_suggestions(extension: str = 'mp4') -> List[Tuple[str, str]]:
     # Return suggestions for the extension, or default MP4 suggestions
     return codec_suggestions.get(extension.lower(), codec_suggestions['mp4'])
 
+def stitch_videos(
+    video_files: List[str],
+    output_path: str,
+    codec: str,
+    fps: int,
+    width: int,
+    height: int,
+    show_progress: bool = True
+) -> bool:
+    """
+    Combine multiple video files into a single video.
+
+    This function reads frames from each input video sequentially and writes them
+    to a single output video file. All input videos must have the same resolution
+    and frame rate for proper stitching.
+
+    Args:
+        video_files: List of input video file paths to combine (in order)
+        output_path: Path for the combined output video file
+        codec: FourCC codec code for output video (e.g., 'mp4v', 'xdv7')
+        fps: Frame rate for output video
+        width: Video width in pixels
+        height: Video height in pixels
+        show_progress: Display progress bar during stitching (default: True)
+
+    Returns:
+        bool: True if stitching succeeded, False otherwise
+
+    Raises:
+        ValueError: If video_files is empty or output_path is invalid
+        RuntimeError: If video reading or writing fails
+
+    Example:
+        >>> videos = ['video1.mp4', 'video2.mp4', 'video3.mp4']
+        >>> stitch_videos(videos, 'combined.mp4', 'mp4v', 30, 1920, 1080)
+        True
+    """
+    if not video_files:
+        raise ValueError("No video files provided for stitching")
+
+    if not output_path:
+        raise ValueError("Output path cannot be empty")
+
+    # Count total frames for progress tracking
+    total_frames = 0
+    if show_progress:
+        for video_file in video_files:
+            try:
+                cap = cv2.VideoCapture(video_file)
+                frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                total_frames += frame_count
+                cap.release()
+            except:
+                pass  # If we can't count, we'll show progress without total
+
+    # Initialize output video writer
+    fourcc = cv2.VideoWriter_fourcc(*codec)
+
+    try:
+        with VideoWriterContext(output_path, fourcc, fps, (width, height)) as out:
+            if not out.isOpened():
+                raise RuntimeError(f"Failed to initialize video writer for {output_path}")
+
+            # Set up progress bar
+            frames_written = 0
+            iterator = video_files
+            if show_progress and total_frames > 0:
+                pbar = tqdm(total=total_frames, desc="  Stitching videos", unit="frame")
+            elif show_progress:
+                pbar = None
+                print("  Stitching videos...")
+            else:
+                pbar = None
+
+            # Process each video file
+            for video_file in iterator:
+                # Open video file
+                cap = cv2.VideoCapture(video_file)
+
+                if not cap.isOpened():
+                    if pbar:
+                        pbar.close()
+                    raise RuntimeError(f"Failed to open video file: {video_file}")
+
+                # Read and write frames
+                while True:
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
+
+                    # Verify frame dimensions match expected size
+                    if frame.shape[1] != width or frame.shape[0] != height:
+                        cap.release()
+                        if pbar:
+                            pbar.close()
+                        raise RuntimeError(
+                            f"Video {video_file} has different dimensions "
+                            f"({frame.shape[1]}x{frame.shape[0]}) than expected ({width}x{height})"
+                        )
+
+                    out.write(frame)
+                    frames_written += 1
+
+                    if pbar:
+                        pbar.update(1)
+
+                cap.release()
+
+            if pbar:
+                pbar.close()
+
+        return True
+
+    except Exception as e:
+        # Clean up partial output file on error
+        if os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+            except:
+                pass
+        raise RuntimeError(f"Error during video stitching: {e}")
+
 def parse_arguments() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -366,6 +488,9 @@ Examples:
 
   # Adjust zoom and blur
   python imgToVideo.py --zoom 0.0006 --blur 201
+
+  # Process images and combine into one video
+  python imgToVideo.py -i ./images -o ./videos --stitch
         """
     )
 
@@ -430,6 +555,10 @@ Examples:
     parser.add_argument('--dry-run',
                         action='store_true',
                         help='Preview what would be processed without actually creating videos')
+
+    parser.add_argument('--stitch',
+                        action='store_true',
+                        help='Combine all output videos into a single video file after processing')
 
     return parser.parse_args()
 
@@ -771,3 +900,57 @@ if __name__ == "__main__":
     if error_count > 0:
         log_verbose(f"Success rate: {success_count / (success_count + error_count) * 100:.1f}%")
     log_info("=" * 50)
+
+    # Stitch videos if requested
+    if args.stitch and success_count > 0:
+        log_info("")
+        log_info("Stitching videos together...")
+        log_verbose(f"Collecting video files from output directory: {args.output}")
+
+        # Collect all created video files
+        video_files = []
+        for file in image_files:
+            fileName = os.path.splitext(file)
+            output_filename = f"{fileName[0]}_video.{args.extension}"
+            outputPath = os.path.join(args.output, output_filename)
+
+            # Only include files that exist (successfully processed)
+            if os.path.exists(outputPath):
+                video_files.append(outputPath)
+                log_verbose(f"  Found video: {output_filename}")
+
+        if len(video_files) == 0:
+            log_error("[ERROR] No video files found to stitch")
+        elif len(video_files) == 1:
+            log_info("[INFO] Only one video file found, skipping stitch operation")
+        else:
+            # Sort video files to ensure consistent ordering (alphabetical by filename)
+            video_files.sort()
+
+            # Create combined output filename
+            combined_filename = f"combined_output.{args.extension}"
+            combined_path = os.path.join(args.output, combined_filename)
+            log_verbose(f"Combined output path: {combined_path}")
+
+            try:
+                log_verbose(f"Stitching {len(video_files)} videos together")
+                stitch_videos(
+                    video_files=video_files,
+                    output_path=combined_path,
+                    codec=args.codec,
+                    fps=args.fps,
+                    width=args.width,
+                    height=args.height,
+                    show_progress=not args.quiet
+                )
+                log_info(f"[OK] Successfully created combined video: {combined_path}")
+                log_verbose(f"Combined {len(video_files)} videos into one file")
+
+            except ValueError as e:
+                log_error(f"[ERROR] Validation error during stitching: {e}")
+            except RuntimeError as e:
+                log_error(f"[ERROR] Error stitching videos: {e}")
+            except Exception as e:
+                log_error(f"[ERROR] Unexpected error during stitching: {e}")
+
+        log_info("")

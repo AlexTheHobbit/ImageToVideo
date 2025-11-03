@@ -66,6 +66,41 @@ uv run python imgToVideo.py --quiet --duration 1 --fps 5 --codec mp4v --extensio
 uv run python imgToVideo.py --codec FAKE --extension mp4
 ```
 
+### Building Standalone Executable
+The project can be built into a portable .exe file using PyInstaller, which bundles Python and all dependencies.
+
+**Build the executable**:
+```bash
+# Install PyInstaller (already in dev dependencies)
+uv sync --no-install-project
+
+# Build with PyInstaller
+uv run pyinstaller --onefile --name imgToVideo imgToVideo.py
+
+# The executable will be created at: dist/imgToVideo.exe
+```
+
+**Using the executable**:
+```bash
+# The .exe is completely standalone - no Python installation required
+.\dist\imgToVideo.exe --help
+
+# Example usage
+.\dist\imgToVideo.exe -i ./photos -o ./videos --codec mp4v --extension mp4
+```
+
+**Build details**:
+- Output: `dist/imgToVideo.exe` (~52MB)
+- Configuration: `imgToVideo.spec` (auto-generated, can be customized)
+- Build artifacts: `build/` directory (can be deleted after build)
+- The executable is portable and can be distributed without any dependencies
+
+**Customizing the build**:
+Edit `imgToVideo.spec` to customize the build process, then rebuild:
+```bash
+uv run pyinstaller imgToVideo.spec
+```
+
 ## Architecture
 
 ### Single-File Design
@@ -283,8 +318,8 @@ iterator = items if args.quiet else tqdm(items, desc="Processing", unit="item")
   - [ ] Create PyPI package
   - [ ] Add `setup.py` and proper package structure
   - [ ] Include pre-built binaries for common platforms
-- [ ] Create standalone executables
-  - [ ] Use PyInstaller for Windows/Mac/Linux
+- [x] Create standalone executables
+  - [x] Use PyInstaller for Windows/Mac/Linux
   - [ ] Test on clean systems without Python
 - [ ] Add Docker support
   - [ ] Create Dockerfile for containerized usage

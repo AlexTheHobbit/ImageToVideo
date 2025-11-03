@@ -604,6 +604,94 @@ def load_config_file() -> dict:
         return {}
 
 
+def process_single_image(args_tuple):
+    """
+    Process a single image to video (worker function for parallel processing).
+
+    This function is designed to be called by multiprocessing workers.
+    It takes a tuple of arguments to be compatible with multiprocessing.Pool.map().
+
+    Args:
+        args_tuple: Tuple containing (file, args_dict) where:
+            - file: str - Image filename
+            - args_dict: dict - Dictionary of processing parameters
+
+    Returns:
+        tuple: (success: bool, file: str, output_path: str, error_msg: str or None)
+
+    Note:
+        Progress bars for frame generation are disabled in parallel mode to avoid
+        conflicts between workers. Overall progress is tracked by the main process.
+    """
+    import os
+    import cv2
+
+    file, args_dict = args_tuple
+
+    # Extract parameters from args dictionary
+    input_dir = args_dict['input']
+    output_dir = args_dict['output']
+    width = args_dict['width']
+    height = args_dict['height']
+    fps = args_dict['fps']
+    duration = args_dict['duration']
+    zoom = args_dict['zoom']
+    blur = args_dict['blur']
+    codec = args_dict['codec']
+    extension = args_dict['extension']
+    force = args_dict['force']
+
+    try:
+        # Build paths
+        input_path = os.path.join(input_dir, file)
+        fileName = os.path.splitext(file)
+        output_filename = f"{fileName[0]}_video.{extension}"
+        output_path = os.path.join(output_dir, output_filename)
+
+        # Check if output already exists (resume capability)
+        if os.path.exists(output_path) and not force:
+            return (False, file, output_path, "SKIP")
+
+        # Process image and generate frames
+        blurred_img = scaleAndBlur(
+            input_path,
+            targetWidth=width,
+            targetHeight=height,
+            targetBlur=blur
+        )
+
+        # Generate frames (disable progress bar in parallel mode)
+        img_sequence = frames_from_image(
+            blurred_img,
+            frameRate=fps,
+            imgDuration=duration,
+            zoomRate=zoom,
+            targetWidth=width,
+            targetHeight=height,
+            show_progress=False  # Disabled for parallel processing
+        )
+
+        # Setup video writer
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+
+        with VideoWriterContext(output_path, fourcc, fps, (width, height)) as out:
+            if not out.isOpened():
+                raise RuntimeError(f"Failed to initialize video writer")
+
+            # Write frames to video
+            for frame in img_sequence:
+                out.write(frame)
+
+        return (True, file, output_path, None)
+
+    except ValueError as e:
+        return (False, file, "", f"ValueError: {e}")
+    except RuntimeError as e:
+        return (False, file, "", f"RuntimeError: {e}")
+    except Exception as e:
+        return (False, file, "", f"Unexpected error: {e}")
+
+
 def parse_arguments() -> argparse.Namespace:
     """
     Parse command-line arguments.
@@ -719,6 +807,12 @@ Configuration file:
                         action='store_true',
                         default=get_default('stitch', False),
                         help='Combine all output videos into a single video file after processing')
+
+    parser.add_argument('-j', '--jobs',
+                        type=int,
+                        default=get_default('jobs', 1),
+                        help='Number of parallel jobs for processing (default: 1, sequential). '
+                             'Use -j 0 for auto-detect (number of CPU cores)')
 
     args = parser.parse_args()
 
@@ -940,124 +1034,198 @@ if __name__ == "__main__":
         log_info("To execute, run without --dry-run flag")
         exit(0)
 
-    # Process each image file
+    # Determine number of parallel jobs
+    num_jobs = args.jobs
+    if num_jobs == 0:
+        # Auto-detect: use number of CPU cores
+        import multiprocessing
+        num_jobs = multiprocessing.cpu_count()
+        log_verbose(f"Auto-detected {num_jobs} CPU cores for parallel processing")
+
+    if num_jobs < 0:
+        log_error(f"[ERROR] Invalid number of jobs: {num_jobs}. Must be >= 0")
+        exit(1)
+
+    # Validate jobs parameter
+    if num_jobs > 1 and args.verbose:
+        log_info(f"Using parallel processing with {num_jobs} workers")
+
+    # Process images: either sequentially or in parallel
     success_count = 0
     error_count = 0
+    skip_count = 0
 
-    # Set up iterator with or without progress bar based on quiet mode
-    iterator = image_files if args.quiet else tqdm(image_files, desc="Processing images", unit="image")
+    if num_jobs > 1:
+        # PARALLEL PROCESSING
+        import multiprocessing
 
-    for file in iterator:
-        # Check if file has a supported image extension (case-insensitive)
-        file_ext = os.path.splitext(file)[1].lower()
-        if file_ext in SUPPORTED_FORMATS:
-            try:
-                # Log processing start
-                if args.quiet:
-                    pass  # No output in quiet mode
-                elif args.verbose:
-                    print(f"Processing: {file}")
+        # Create args dictionary for worker processes
+        args_dict = {
+            'input': args.input,
+            'output': args.output,
+            'width': args.width,
+            'height': args.height,
+            'fps': args.fps,
+            'duration': args.duration,
+            'zoom': args.zoom,
+            'blur': args.blur,
+            'codec': args.codec,
+            'extension': args.extension,
+            'force': args.force,
+        }
+
+        # Prepare work items (file, args_dict) tuples
+        work_items = [(file, args_dict) for file in image_files]
+
+        log_verbose(f"Starting multiprocessing pool with {num_jobs} workers")
+
+        # Process in parallel with progress bar
+        with multiprocessing.Pool(processes=num_jobs) as pool:
+            # Use imap_unordered for better performance (results may arrive out of order)
+            results = pool.imap_unordered(process_single_image, work_items)
+
+            # Set up progress bar
+            if not args.quiet:
+                results = tqdm(results, total=len(image_files), desc="Processing images", unit="image")
+
+            # Collect results
+            for success, file, output_path, error_msg in results:
+                if error_msg == "SKIP":
+                    skip_count += 1
+                    if not args.quiet and not args.verbose:
+                        tqdm.write(f"[SKIP] Output already exists for: {file}")
+                elif success:
+                    success_count += 1
+                    if not args.quiet and not args.verbose:
+                        tqdm.write(f"[OK] Successfully created: {output_path}")
+                    elif args.verbose:
+                        print(f"[OK] Successfully created: {output_path}")
                 else:
-                    tqdm.write(f"Processing: {file}")
+                    error_count += 1
+                    msg = f"[ERROR] Error processing {file}: {error_msg}"
+                    if args.quiet:
+                        log_error(msg)
+                    else:
+                        tqdm.write(msg)
 
-                # Build full input path
-                input_path = os.path.join(args.input, file)
-                log_verbose(f"Input path: {input_path}")
+        log_verbose(f"Parallel processing complete: {success_count} succeeded, {error_count} failed, {skip_count} skipped")
 
-                # Determine output path early to check if it exists
-                fileName = os.path.splitext(file)
-                output_filename = f"{fileName[0]}_video.{args.extension}"
-                outputPath = os.path.join(args.output, output_filename)
+    else:
+        # SEQUENTIAL PROCESSING (original logic)
+        # Set up iterator with or without progress bar based on quiet mode
+        iterator = image_files if args.quiet else tqdm(image_files, desc="Processing images", unit="image")
 
-                # Check if output already exists (resume capability)
-                if os.path.exists(outputPath) and not args.force:
-                    msg = f"[SKIP] Output already exists: {outputPath}"
+        for file in iterator:
+            # Check if file has a supported image extension (case-insensitive)
+            file_ext = os.path.splitext(file)[1].lower()
+            if file_ext in SUPPORTED_FORMATS:
+                try:
+                    # Log processing start
                     if args.quiet:
                         pass  # No output in quiet mode
+                    elif args.verbose:
+                        print(f"Processing: {file}")
+                    else:
+                        tqdm.write(f"Processing: {file}")
+
+                    # Build full input path
+                    input_path = os.path.join(args.input, file)
+                    log_verbose(f"Input path: {input_path}")
+
+                    # Determine output path early to check if it exists
+                    fileName = os.path.splitext(file)
+                    output_filename = f"{fileName[0]}_video.{args.extension}"
+                    outputPath = os.path.join(args.output, output_filename)
+
+                    # Check if output already exists (resume capability)
+                    if os.path.exists(outputPath) and not args.force:
+                        msg = f"[SKIP] Output already exists: {outputPath}"
+                        if args.quiet:
+                            pass  # No output in quiet mode
+                        elif args.verbose:
+                            print(msg)
+                        else:
+                            tqdm.write(msg)
+                        log_verbose("Use --force to reprocess existing files")
+                        continue
+
+                    log_verbose(f"Output path: {outputPath}")
+
+                    # Process image and generate frames
+                    log_verbose(f"Scaling and blurring image with {args.blur}px kernel")
+                    blurredImg = scaleAndBlur(
+                        input_path,
+                        targetWidth=args.width,
+                        targetHeight=args.height,
+                        targetBlur=args.blur
+                    )
+                    log_verbose(f"Image scaled to {args.width}x{args.height}")
+
+                    log_verbose(f"Generating {args.fps * args.duration} frames")
+                    imgSequence = frames_from_image(
+                        blurredImg,
+                        frameRate=args.fps,
+                        imgDuration=args.duration,
+                        zoomRate=args.zoom,
+                        targetWidth=args.width,
+                        targetHeight=args.height,
+                        show_progress=not args.quiet
+                    )
+
+                    # Setup video writer with context manager for automatic cleanup
+                    log_verbose(f"Initializing VideoWriter with codec '{args.codec}'")
+                    fourcc = cv2.VideoWriter_fourcc(*args.codec)
+
+                    with VideoWriterContext(outputPath, fourcc, args.fps, (args.width, args.height)) as out:
+                        if not out.isOpened():
+                            raise RuntimeError(f"Failed to initialize video writer for {outputPath}. Check codec availability.")
+
+                        # Write frames to video
+                        log_verbose("Writing frames to video file")
+                        for frame in imgSequence:
+                            out.write(frame)
+
+                    log_verbose("Video file closed successfully")
+
+                    # Log success
+                    if args.quiet:
+                        pass  # No output in quiet mode
+                    elif args.verbose:
+                        print(f"[OK] Successfully created: {outputPath}")
+                    else:
+                        tqdm.write(f"[OK] Successfully created: {outputPath}")
+                    success_count += 1
+
+                except ValueError as e:
+                    msg = f"[ERROR] Error processing {file}: {e}"
+                    if args.quiet:
+                        log_error(msg)
                     elif args.verbose:
                         print(msg)
                     else:
                         tqdm.write(msg)
-                    log_verbose("Use --force to reprocess existing files")
+                    error_count += 1
                     continue
-
-                log_verbose(f"Output path: {outputPath}")
-
-                # Process image and generate frames
-                log_verbose(f"Scaling and blurring image with {args.blur}px kernel")
-                blurredImg = scaleAndBlur(
-                    input_path,
-                    targetWidth=args.width,
-                    targetHeight=args.height,
-                    targetBlur=args.blur
-                )
-                log_verbose(f"Image scaled to {args.width}x{args.height}")
-
-                log_verbose(f"Generating {args.fps * args.duration} frames")
-                imgSequence = frames_from_image(
-                    blurredImg,
-                    frameRate=args.fps,
-                    imgDuration=args.duration,
-                    zoomRate=args.zoom,
-                    targetWidth=args.width,
-                    targetHeight=args.height,
-                    show_progress=not args.quiet
-                )
-
-                # Setup video writer with context manager for automatic cleanup
-                log_verbose(f"Initializing VideoWriter with codec '{args.codec}'")
-                fourcc = cv2.VideoWriter_fourcc(*args.codec)
-
-                with VideoWriterContext(outputPath, fourcc, args.fps, (args.width, args.height)) as out:
-                    if not out.isOpened():
-                        raise RuntimeError(f"Failed to initialize video writer for {outputPath}. Check codec availability.")
-
-                    # Write frames to video
-                    log_verbose("Writing frames to video file")
-                    for frame in imgSequence:
-                        out.write(frame)
-
-                log_verbose("Video file closed successfully")
-
-                # Log success
-                if args.quiet:
-                    pass  # No output in quiet mode
-                elif args.verbose:
-                    print(f"[OK] Successfully created: {outputPath}")
-                else:
-                    tqdm.write(f"[OK] Successfully created: {outputPath}")
-                success_count += 1
-
-            except ValueError as e:
-                msg = f"[ERROR] Error processing {file}: {e}"
-                if args.quiet:
-                    log_error(msg)
-                elif args.verbose:
-                    print(msg)
-                else:
-                    tqdm.write(msg)
-                error_count += 1
-                continue
-            except RuntimeError as e:
-                msg = f"[ERROR] Error creating video for {file}: {e}"
-                if args.quiet:
-                    log_error(msg)
-                elif args.verbose:
-                    print(msg)
-                else:
-                    tqdm.write(msg)
-                error_count += 1
-                continue
-            except Exception as e:
-                msg = f"[ERROR] Unexpected error processing {file}: {e}"
-                if args.quiet:
-                    log_error(msg)
-                elif args.verbose:
-                    print(msg)
-                else:
-                    tqdm.write(msg)
-                error_count += 1
-                continue
+                except RuntimeError as e:
+                    msg = f"[ERROR] Error creating video for {file}: {e}"
+                    if args.quiet:
+                        log_error(msg)
+                    elif args.verbose:
+                        print(msg)
+                    else:
+                        tqdm.write(msg)
+                    error_count += 1
+                    continue
+                except Exception as e:
+                    msg = f"[ERROR] Unexpected error processing {file}: {e}"
+                    if args.quiet:
+                        log_error(msg)
+                    elif args.verbose:
+                        print(msg)
+                    else:
+                        tqdm.write(msg)
+                    error_count += 1
+                    continue
 
     # Print summary
     log_info("")

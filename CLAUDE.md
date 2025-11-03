@@ -31,7 +31,7 @@ uv run python imgToVideo.py --quiet     # Silent mode (errors only)
 ```
 
 ### Testing Changes
-The project now has a comprehensive automated test suite with 103 tests and 84% code coverage.
+The project now has a comprehensive automated test suite with 119 tests and 88.6% code coverage.
 
 **Running tests**:
 ```bash
@@ -198,14 +198,15 @@ iterator = items if args.quiet else tqdm(items, desc="Processing", unit="item")
 
 Based on project maturity, user value, and development momentum:
 
-**1. Configuration File Support (Phase 2)** - **HIGHEST PRIORITY**
-- **What**: Add `.imgtovideorc` or `config.yaml` for setting defaults
-- **Why**: High user value for repeated workflows, reduces repetitive CLI arguments
-- **Effort**: 4-5 hours
-- **Impact**: Significantly improves user experience for batch operations
-- **Implementation**: Load config file, override with CLI args, support YAML and simple KEY=VALUE format
+**1. ~~Configuration File Support (Phase 2)~~** - ✅ **COMPLETED**
+- ✅ Implemented `.imgtovideorc` (simple KEY=VALUE) and `imgtovideorc.yaml` (YAML) support
+- ✅ Config file search in current dir and home dir (~/.config/)
+- ✅ CLI arguments override config values as expected
+- ✅ 16 comprehensive tests added (119 total tests now)
+- ✅ Fully documented in README.md with examples
+- **Result**: 88.6% coverage, all tests passing
 
-**2. Parallel Processing (Phase 3)** - **HIGH IMPACT**
+**2. Parallel Processing (Phase 3)** - **NEW HIGHEST PRIORITY**
 - **What**: Process multiple images concurrently with `--jobs` flag
 - **Why**: Dramatic speed improvement for batch operations (2-4x faster)
 - **Effort**: 8-10 hours
@@ -254,14 +255,16 @@ Based on project maturity, user value, and development momentum:
 
 **Priority: HIGH** - These features provide immediate user value
 
-- [ ] **Configuration file support** ⭐ RECOMMENDED NEXT
-  - [ ] Allow `.imgtovideorc` or `config.yaml` for defaults
-  - [ ] Support per-project configuration
-  - [ ] CLI arguments override config file
-  - [ ] Document configuration options
-  - **Rationale**: Reduces repetitive CLI arguments for batch workflows
-  - **Estimated effort**: 4-5 hours
-  - **User value**: High - simplifies repeated use
+- [x] **Configuration file support** ✅ **COMPLETED**
+  - [x] Allow `.imgtovideorc` or `imgtovideorc.yaml` for defaults
+  - [x] Support per-project and home directory configuration
+  - [x] CLI arguments override config file values
+  - [x] Document configuration options in README
+  - [x] Comprehensive test suite (16 tests)
+  - [x] Support simple KEY=VALUE and YAML formats
+  - [x] Handle comments, type conversion, inline comments
+  - **Status**: Fully implemented with 88.6% code coverage
+  - **Actual effort**: ~4 hours (as estimated)
 
 - [ ] **Transition effects for stitched videos**
   - [ ] Add fade transitions between stitched videos

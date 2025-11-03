@@ -7,6 +7,7 @@ Convert still images into videos with a cinematic Ken Burns zoom effect. Perfect
 - **Ken Burns Effect**: Smooth zoom animation that brings static images to life
 - **Flexible Output**: Support for multiple video codecs and formats (MXF, MP4, AVI, etc.)
 - **Customizable Settings**: Control resolution, frame rate, duration, zoom speed, and blur
+- **Configuration Files**: Set defaults with .imgtovideorc or YAML files for repeated workflows
 - **Batch Processing**: Process multiple images in one command
 - **Video Stitching**: Combine multiple videos into a single slideshow file
 - **Smart Scaling**: Automatically handles various aspect ratios with intelligent cropping
@@ -14,7 +15,7 @@ Convert still images into videos with a cinematic Ken Burns zoom effect. Perfect
 - **Fast Performance**: Powered by OpenCV with optimized image processing
 - **Portable Executable**: Build standalone .exe with no Python installation required
 - **Command-Line Interface**: Easy to use with sensible defaults
-- **Comprehensive Testing**: 103 automated tests with 84%+ code coverage
+- **Comprehensive Testing**: 119 automated tests with 88%+ code coverage
 
 ## Installation
 
@@ -102,6 +103,56 @@ uv run python imgToVideo.py --width 3840 --height 2160 --fps 30 --duration 15
 ```bash
 uv run python imgToVideo.py --zoom 0.0006 --blur 201
 ```
+
+### Using Configuration Files
+
+Create a configuration file to set default values and avoid repetitive command-line arguments:
+
+```bash
+# Create .imgtovideorc in your project directory
+cat > .imgtovideorc <<EOF
+# Video settings
+width=3840
+height=2160
+fps=30
+duration=10
+
+# Codec settings
+codec=mp4v
+extension=mp4
+
+# Effect settings
+zoom=0.0006
+blur=201
+
+# Processing options
+verbose=true
+EOF
+
+# Now run with config defaults (CLI args still override)
+uv run python imgToVideo.py -i ./photos -o ./videos
+```
+
+**Config File Locations** (searched in order):
+1. `.imgtovideorc` (current directory) - Simple KEY=VALUE format
+2. `imgtovideorc.yaml` (current directory) - YAML format
+3. `~/.imgtovideorc` (home directory) - Simple KEY=VALUE format
+4. `~/.config/imgtovideorc.yaml` (home config) - YAML format
+
+**YAML Format Example** (`imgtovideorc.yaml`):
+```yaml
+width: 3840
+height: 2160
+fps: 30
+duration: 10
+codec: mp4v
+extension: mp4
+zoom: 0.0006
+blur: 201
+verbose: true
+```
+
+**Note**: Command-line arguments always override config file values.
 
 ## Command-Line Options
 
@@ -403,12 +454,13 @@ Image to Video Converter/
 
 See [CLAUDE.md](CLAUDE.md) for development guide and planned improvements roadmap.
 
-### Current Version: 1.1.0
+### Current Version: 1.2.0
 
 **Recent Updates**:
+- ✓ **Configuration file support** - Set defaults with .imgtovideorc or YAML files
 - ✓ **Video stitching feature** - Combine multiple videos into slideshows
 - ✓ **Portable executable builds** - Create standalone .exe with PyInstaller
-- ✓ **Comprehensive test suite** - 103 automated tests, 84%+ coverage
+- ✓ **Comprehensive test suite** - 119 automated tests, 88%+ coverage
 - ✓ **Dry-run mode** - Preview processing without creating files
 - ✓ **Force and resume modes** - Better control over batch processing
 - ✓ **Verbose and quiet modes** - Flexible output logging

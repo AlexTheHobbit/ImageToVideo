@@ -470,8 +470,153 @@ def stitch_videos(
                 pass
         raise RuntimeError(f"Error during video stitching: {e}")
 
+def load_config_file() -> dict:
+    """
+    Load configuration from config file if it exists.
+
+    Searches for config files in the following order:
+    1. .imgtovideorc (current directory) - simple KEY=VALUE format
+    2. imgtovideorc.yaml (current directory) - YAML format
+    3. ~/.imgtovideorc (home directory) - simple KEY=VALUE format
+    4. ~/.config/imgtovideorc.yaml (home directory) - YAML format
+
+    Returns:
+        dict: Configuration dictionary with parameter names as keys.
+              Empty dict if no config file found.
+
+    Config file format examples:
+
+    Simple format (.imgtovideorc):
+        width=1920
+        height=1080
+        fps=30
+        duration=10
+        codec=mp4v
+        extension=mp4
+
+    YAML format (imgtovideorc.yaml):
+        width: 1920
+        height: 1080
+        fps: 30
+        duration: 10
+        codec: mp4v
+        extension: mp4
+    """
+    import os
+    from pathlib import Path
+
+    config = {}
+
+    # Define search paths in order of priority
+    config_paths = [
+        Path('.imgtovideorc'),                                    # Current directory (simple)
+        Path('imgtovideorc.yaml'),                                # Current directory (YAML)
+        Path.home() / '.imgtovideorc',                           # Home directory (simple)
+        Path.home() / '.config' / 'imgtovideorc.yaml',          # Home config (YAML)
+    ]
+
+    # Find first existing config file
+    config_file = None
+    for path in config_paths:
+        if path.exists() and path.is_file():
+            config_file = path
+            break
+
+    if not config_file:
+        return config
+
+    try:
+        # Determine format based on extension
+        if config_file.suffix == '.yaml' or config_file.suffix == '.yml':
+            # YAML format
+            try:
+                import yaml
+                with open(config_file, 'r') as f:
+                    loaded = yaml.safe_load(f)
+                    if loaded and isinstance(loaded, dict):
+                        config = loaded
+            except ImportError:
+                # YAML library not available, skip YAML files
+                pass
+        else:
+            # Simple KEY=VALUE format
+            with open(config_file, 'r') as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+
+                    # Skip empty lines and comments
+                    if not line or line.startswith('#'):
+                        continue
+
+                    # Parse KEY=VALUE
+                    if '=' not in line:
+                        continue
+
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+
+                    # Strip inline comments (not inside quotes)
+                    if '#' in value:
+                        # Check if # is inside quotes
+                        in_quotes = False
+                        quote_char = None
+                        for i, char in enumerate(value):
+                            if char in ('"', "'") and (i == 0 or value[i-1] != '\\'):
+                                if not in_quotes:
+                                    in_quotes = True
+                                    quote_char = char
+                                elif char == quote_char:
+                                    in_quotes = False
+                                    quote_char = None
+                            elif char == '#' and not in_quotes:
+                                value = value[:i].strip()
+                                break
+
+                    # Remove quotes from value if present
+                    if value.startswith('"') and value.endswith('"'):
+                        value = value[1:-1]
+                    elif value.startswith("'") and value.endswith("'"):
+                        value = value[1:-1]
+
+                    # Convert value types
+                    # Boolean values
+                    if value.lower() in ('true', 'yes', 'on', '1'):
+                        value = True
+                    elif value.lower() in ('false', 'no', 'off', '0'):
+                        value = False
+                    # Numeric values
+                    elif value.isdigit():
+                        value = int(value)
+                    elif '.' in value:
+                        try:
+                            value = float(value)
+                        except ValueError:
+                            pass  # Keep as string
+
+                    config[key] = value
+
+        return config
+
+    except Exception as e:
+        # If config file exists but can't be read, warn but don't fail
+        print(f"[WARNING] Could not load config file {config_file}: {e}")
+        return {}
+
+
 def parse_arguments() -> argparse.Namespace:
-    """Parse command-line arguments."""
+    """
+    Parse command-line arguments.
+
+    Loads configuration from config file if present, then parses command-line arguments.
+    Command-line arguments override config file values.
+
+    Returns:
+        argparse.Namespace: Parsed arguments with config defaults applied
+    """
+    # Load configuration file (if present)
+    config = load_config_file()
+
     parser = argparse.ArgumentParser(
         description='Convert images to videos with Ken Burns zoom effect',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -491,76 +636,98 @@ Examples:
 
   # Process images and combine into one video
   python imgToVideo.py -i ./images -o ./videos --stitch
+
+Configuration file:
+  Create .imgtovideorc or imgtovideorc.yaml in current or home directory
+  to set default values. Command-line arguments override config file.
         """
     )
 
+    # Helper function to get config value with fallback
+    def get_default(key: str, fallback):
+        """Get value from config or use fallback default."""
+        return config.get(key, fallback)
+
     parser.add_argument('-i', '--input',
-                        default='.',
+                        default=get_default('input', '.'),
                         help='Input directory containing images (default: current directory)')
 
     parser.add_argument('-o', '--output',
-                        default='.',
+                        default=get_default('output', '.'),
                         help='Output directory for videos (default: current directory)')
 
     parser.add_argument('-w', '--width',
                         type=int,
-                        default=1920,
+                        default=get_default('width', 1920),
                         help='Target video width in pixels (default: 1920)')
 
     parser.add_argument('--height',
                         type=int,
-                        default=1080,
+                        default=get_default('height', 1080),
                         help='Target video height in pixels (default: 1080)')
 
     parser.add_argument('--fps',
                         type=int,
-                        default=25,
+                        default=get_default('fps', 25),
                         help='Frame rate (frames per second) (default: 25)')
 
     parser.add_argument('-d', '--duration',
                         type=int,
-                        default=10,
+                        default=get_default('duration', 10),
                         help='Video duration in seconds (default: 10)')
 
     parser.add_argument('-z', '--zoom',
                         type=float,
-                        default=0.0004,
+                        default=get_default('zoom', 0.0004),
                         help='Zoom rate (0.0001-0.01) (default: 0.0004)')
 
     parser.add_argument('-b', '--blur',
                         type=int,
-                        default=195,
+                        default=get_default('blur', 195),
                         help='Blur strength (must be odd number) (default: 195)')
 
     parser.add_argument('--codec',
-                        default='xdv7',
+                        default=get_default('codec', 'xdv7'),
                         help='Video codec fourcc code (default: xdv7 for MXF)')
 
     parser.add_argument('--extension',
-                        default='mxf',
+                        default=get_default('extension', 'mxf'),
                         help='Output video file extension (default: mxf)')
 
+    # Boolean flags - use action='store_true' or set default from config
     parser.add_argument('-v', '--verbose',
                         action='store_true',
+                        default=get_default('verbose', False),
                         help='Enable verbose output (detailed processing information)')
 
     parser.add_argument('-q', '--quiet',
                         action='store_true',
+                        default=get_default('quiet', False),
                         help='Enable quiet mode (errors only, no progress bars)')
 
     parser.add_argument('--force',
                         action='store_true',
+                        default=get_default('force', False),
                         help='Force reprocessing of existing output files (default: skip existing)')
 
     parser.add_argument('--dry-run',
                         action='store_true',
+                        default=get_default('dry_run', False) or get_default('dry-run', False),
                         help='Preview what would be processed without actually creating videos')
 
     parser.add_argument('--stitch',
                         action='store_true',
+                        default=get_default('stitch', False),
                         help='Combine all output videos into a single video file after processing')
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    # If config file was loaded and verbose, notify user
+    if config and args.verbose:
+        print(f"[INFO] Loaded configuration from config file")
+        print(f"[INFO] Config values: {', '.join(f'{k}={v}' for k, v in config.items())}")
+
+    return args
 
 if __name__ == "__main__":
     # Parse command-line arguments

@@ -31,7 +31,7 @@ uv run python imgToVideo.py --quiet     # Silent mode (errors only)
 ```
 
 ### Testing Changes
-The project now has a comprehensive automated test suite with 90 tests and 85% code coverage.
+The project now has a comprehensive automated test suite with 103 tests and 84% code coverage.
 
 **Running tests**:
 ```bash
@@ -104,14 +104,20 @@ uv run pyinstaller imgToVideo.spec
 ## Architecture
 
 ### Single-File Design
-The entire application is in `imgToVideo.py` (~585 lines). This is intentional for simplicity and portability.
+The entire application is in `imgToVideo.py` (~956 lines). This is intentional for simplicity and portability.
 
 ### Core Components
 
 **Image Processing Pipeline**:
-1. `scaleAndBlur()` - Prepares image with aspect-ratio-preserving scaling and blurred background
-2. `frames_from_image()` - Generator that yields progressively zoomed frames (memory-efficient)
+1. `scaleAndBlur()` - Prepares image with aspect-ratio-preserving scaling and blurred background (lines 103-158)
+2. `frames_from_image()` - Generator that yields progressively zoomed frames (memory-efficient) (lines 219-251)
 3. Main loop - Streams frames directly to VideoWriter
+
+**Video Stitching Pipeline**:
+1. `stitch_videos()` - Combines multiple video files sequentially (lines 351-471)
+2. Frame dimension validation ensures consistent output
+3. Progress tracking across multiple videos
+4. Automatic cleanup on error
 
 **Key Design Decisions**:
 - **Generator Pattern**: `frames_from_image()` yields frames one at a time instead of building a list
@@ -188,144 +194,235 @@ iterator = items if args.quiet else tqdm(items, desc="Processing", unit="item")
 
 ## Development Roadmap
 
+### ⭐ Recommended Next Steps (Top 3 Priorities)
+
+Based on project maturity, user value, and development momentum:
+
+**1. Configuration File Support (Phase 2)** - **HIGHEST PRIORITY**
+- **What**: Add `.imgtovideorc` or `config.yaml` for setting defaults
+- **Why**: High user value for repeated workflows, reduces repetitive CLI arguments
+- **Effort**: 4-5 hours
+- **Impact**: Significantly improves user experience for batch operations
+- **Implementation**: Load config file, override with CLI args, support YAML and simple KEY=VALUE format
+
+**2. Parallel Processing (Phase 3)** - **HIGH IMPACT**
+- **What**: Process multiple images concurrently with `--jobs` flag
+- **Why**: Dramatic speed improvement for batch operations (2-4x faster)
+- **Effort**: 8-10 hours
+- **Impact**: High for users processing many images
+- **Risk**: Moderate - requires careful handling of progress bars and logging
+- **Implementation**: Use multiprocessing pool, maintain generator pattern for memory efficiency
+
+**3. Pan Effects (Phase 2)** - **NATURAL EXTENSION**
+- **What**: Add `--pan-direction` for left/right/up/down camera movement
+- **Why**: Extends Ken Burns effect with more creative options
+- **Effort**: 6-8 hours
+- **Impact**: Medium-High - adds variety to video output
+- **Implementation**: Modify frame generation to support both zoom and pan transforms
+
 ### Phase 1: Testing & Validation Foundation ✅ **COMPLETED**
-**Goal**: Establish a robust testing infrastructure
 
-- ✅ Create unit tests for core functions
-  - ✅ `scaleAndBlur()` - test aspect ratio handling, blur validation (25 tests)
-  - ✅ `frames_from_image()` - test generator pattern, zoom calculations (27 tests)
-  - ✅ `validate_codec()` - test various codec scenarios (24 tests)
-  - ✅ `get_codec_suggestions()` - test suggestion accuracy (included in codec tests)
-- ✅ Add integration tests for full processing pipeline
-  - ✅ Test processing single image end-to-end (4 tests)
-  - ✅ Test batch processing with multiple images (2 tests)
-  - ✅ Test resume capability (skip existing files) (2 tests)
-- ✅ Implement output video validation
-  - ✅ Verify output file exists and has content
-  - ✅ Check video metadata (duration, fps, resolution)
-  - ✅ Validate frame count matches expected
-- ✅ Add test fixtures and sample images
-  - ✅ Wide (landscape) test image
-  - ✅ Narrow (portrait) test image
-  - ✅ Square test image
-  - ✅ Edge cases (very small, very large)
+**Status**: Successfully established comprehensive testing infrastructure with automated validation, full test coverage of core functionality, and PyInstaller build capability.
 
-**Test Suite Summary**:
-- **90 total tests** (88 fast, 2 slow)
-- **85% code coverage** of imgToVideo.py
+**Completed Deliverables**:
+- ✅ **Unit test suite**: 76 tests covering core functions (scaleAndBlur, frames_from_image, codec validation)
+- ✅ **Integration tests**: 13 tests for end-to-end pipeline, batch processing, resume capability
+- ✅ **Video stitching tests**: 13 tests for combining multiple videos (NEW)
+- ✅ **Test infrastructure**: Shared fixtures, helper functions, automated validation
+- ✅ **Output validation**: Metadata checks, frame counting, playback verification
+- ✅ **PyInstaller integration**: Portable executable build capability
+- ✅ **Video stitching feature**: Combine multiple videos into slideshows (120 lines)
+
+**Current Test Suite**:
+- **103 total tests** (101 fast, 2 slow marked)
+- **84.42% code coverage** (target: 85%)
 - **Test files**:
   - `tests/test_scale_and_blur.py` - 25 unit tests
-  - `tests/test_frames_from_image.py` - 27 unit tests
+  - `tests/test_frames_from_image.py` - 28 unit tests
   - `tests/test_codec_validation.py` - 24 unit tests
   - `tests/test_integration.py` - 13 integration tests
+  - `tests/test_stitching.py` - 13 integration tests (NEW)
   - `tests/conftest.py` - Shared fixtures and utilities
 - **Running tests**: `uv run pytest tests/ -v`
 
-### Phase 2: User Experience & Features
-**Goal**: Make the tool more user-friendly and capable
+**Remaining Coverage Gaps** (15.58% uncovered):
+- CLI argument parsing and main execution (lines 475-563) - Hard to test without subprocess
+- Some error paths in VideoWriterContext and stitch_videos
 
-- [ ] Add configuration file support
+### Phase 2: Essential User Features
+**Goal**: Make the tool easier to use for common workflows
+
+**Priority: HIGH** - These features provide immediate user value
+
+- [ ] **Configuration file support** ⭐ RECOMMENDED NEXT
   - [ ] Allow `.imgtovideorc` or `config.yaml` for defaults
   - [ ] Support per-project configuration
+  - [ ] CLI arguments override config file
   - [ ] Document configuration options
-- [ ] Implement pan effects alongside zoom
+  - **Rationale**: Reduces repetitive CLI arguments for batch workflows
+  - **Estimated effort**: 4-5 hours
+  - **User value**: High - simplifies repeated use
+
+- [ ] **Transition effects for stitched videos**
+  - [ ] Add fade transitions between stitched videos
+  - [ ] Support cross-dissolve effects
+  - [ ] Configurable transition duration
+  - **Rationale**: Makes slideshows more professional
+  - **Estimated effort**: 6-8 hours
+
+- [ ] **Implement pan effects alongside zoom**
   - [ ] Add `--pan-direction` argument (left, right, up, down)
   - [ ] Support combined zoom + pan
   - [ ] Add random pan option for variation
-- [ ] Add audio support
-  - [ ] Allow background music/audio file
-  - [ ] Support audio fade in/out
-  - [ ] Match audio duration to video
-- [ ] Improve error messages and recovery
+  - **Rationale**: Extends Ken Burns effect with more dynamic motion
+  - **Estimated effort**: 6-8 hours
+  - **User value**: Medium-High - adds creative options
+
+- [ ] **Improve error messages and recovery**
   - [ ] Better suggestions when codec fails
   - [ ] Graceful handling of corrupted images
   - [ ] Retry logic for transient failures
-- [ ] Add more output options
+
+- [ ] **Add output quality presets**
   - [ ] Support for preset quality levels (low, medium, high, ultra)
   - [ ] Bitrate control
   - [ ] Compression level control
+  - **Estimated effort**: 3-4 hours
 
-### Phase 3: Code Quality & Architecture
+- [ ] **Add audio support**
+  - [ ] Allow background music/audio file
+  - [ ] Support audio fade in/out
+  - [ ] Match audio duration to video
+  - **Note**: Significant scope increase, consider Phase 4
+  - **Estimated effort**: 12-15 hours
+
+### Phase 3: Performance & Scalability
+**Goal**: Handle larger workloads efficiently
+
+**Priority: MEDIUM-HIGH** - Significant performance improvement for batch workflows
+
+- [ ] **Implement parallel processing** ⭐ HIGH IMPACT
+  - [ ] Process multiple images concurrently
+  - [ ] Use multiprocessing pool for CPU-bound work
+  - [ ] Add `--jobs` argument to control parallelism
+  - [ ] Maintain memory efficiency with generator pattern
+  - **Rationale**: Large batches would process much faster
+  - **Estimated effort**: 8-10 hours
+  - **User value**: High for batch operations
+  - **Risk**: Moderate - need careful handling of progress bars, logging
+
+- [ ] **Optimize memory usage**
+  - [ ] Profile memory consumption
+  - [ ] Identify and fix memory leaks
+  - [ ] Add memory usage reporting in verbose mode
+  - **Estimated effort**: 4-6 hours
+
+- [ ] **Add GPU acceleration support**
+  - [ ] Investigate CUDA/OpenCL for frame generation
+  - [ ] Benchmark GPU vs CPU performance
+  - [ ] Make GPU optional (fallback to CPU)
+  - **Note**: Significant research required
+  - **Estimated effort**: 15-20 hours
+
+- [ ] **Add caching for repeated operations**
+  - [ ] Cache scaled/blurred base images
+  - [ ] Implement smart cache invalidation
+
+### Phase 4: Code Quality & Architecture
 **Goal**: Improve maintainability and testability
+
+**Priority: LOW** - Only needed if codebase grows significantly
+
+**Note**: Current single-file structure (956 lines) is still manageable. Consider refactoring if:
+- File exceeds 1500 lines
+- External contributors join the project
+- Complexity becomes difficult to navigate
 
 - [ ] Extract functions into logical modules
   - [ ] `image_processing.py` - scaleAndBlur, frame generation
   - [ ] `codec_validation.py` - codec testing and suggestions
   - [ ] `cli.py` - argument parsing and main execution
   - [ ] `validators.py` - input validation logic
+  - [ ] `stitching.py` - video stitching functionality
+  - **Estimated effort**: 10-12 hours (with tests)
+
 - [ ] Improve type hints and documentation
   - [ ] Add type stubs for better IDE support
   - [ ] Generate API documentation from docstrings
   - [ ] Add more inline comments for complex logic
-- [ ] Refactor VideoWriter context manager
-  - [ ] Consider using dataclasses for configuration
-  - [ ] Add more robust error handling
+
 - [ ] Add logging framework
   - [ ] Replace print statements with proper logging
   - [ ] Support log levels (DEBUG, INFO, WARNING, ERROR)
   - [ ] Add option to write logs to file
+  - **Estimated effort**: 3-4 hours
 
-### Phase 4: Performance & Scalability
-**Goal**: Handle larger workloads efficiently
-
-- [ ] Implement parallel processing
-  - [ ] Process multiple images concurrently
-  - [ ] Use multiprocessing pool for CPU-bound work
-  - [ ] Add `--jobs` argument to control parallelism
-  - [ ] Maintain memory efficiency with generator pattern
-- [ ] Add GPU acceleration support
-  - [ ] Investigate CUDA/OpenCL for frame generation
-  - [ ] Benchmark GPU vs CPU performance
-  - [ ] Make GPU optional (fallback to CPU)
-- [ ] Optimize memory usage
-  - [ ] Profile memory consumption
-  - [ ] Identify and fix memory leaks
-  - [ ] Add memory usage reporting in verbose mode
-- [ ] Add caching for repeated operations
-  - [ ] Cache scaled/blurred base images
-  - [ ] Implement smart cache invalidation
+- [ ] Refactor VideoWriter context manager
+  - [ ] Consider using dataclasses for configuration
+  - [ ] Add more robust error handling
 
 ### Phase 5: Advanced Features
 **Goal**: Add professional-grade capabilities
 
-- [ ] Support for video sequences
+**Priority: MEDIUM** - Nice-to-have features for power users
+
+- [x] **Support for video sequences** ✅ PARTIALLY COMPLETE
+  - [x] Create slideshow from multiple images (stitching feature)
+  - [ ] Add transition effects between stitched videos (moved to Phase 2)
   - [ ] Accept input folders with numbered image sequences
-  - [ ] Create slideshow from multiple images
-  - [ ] Add transition effects between images
-- [ ] Add filters and effects
+  - [ ] Custom ordering for stitched videos (currently alphabetical)
+
+- [ ] **Add filters and effects**
   - [ ] Color grading presets (vintage, black & white, etc.)
   - [ ] Vignette effect
   - [ ] Film grain/noise
-- [ ] Batch processing enhancements
+  - **Estimated effort**: 8-10 hours
+
+- [ ] **Batch processing enhancements**
   - [ ] Process entire directory tree recursively
   - [ ] Pattern matching for selective processing
   - [ ] Generate index/manifest of processed files
-- [ ] Export presets
+
+- [ ] **Export presets**
   - [ ] Instagram (1080x1080, mp4)
   - [ ] YouTube (1920x1080, h264)
   - [ ] Twitter (1280x720, mp4)
   - [ ] TikTok (1080x1920, mp4)
-- [ ] Add web interface (optional)
+  - **Note**: Could be part of config file support (Phase 2)
+
+- [ ] **Add web interface (optional)**
   - [ ] Simple Flask/FastAPI web UI
   - [ ] Drag-and-drop image upload
   - [ ] Real-time preview
   - [ ] Download processed videos
+  - **Note**: Major scope expansion, separate project?
 
-### Phase 6: Distribution & Deployment
+### Phase 6: Distribution & Deployment ✅ PARTIALLY COMPLETE
 **Goal**: Make the tool easy to install and use
 
-- [ ] Package for distribution
+- [x] **Create standalone executables** ✅ **COMPLETED**
+  - [x] Use PyInstaller for Windows builds
+  - [x] Document build process in CLAUDE.md and README.md
+  - [x] ~52MB portable .exe with bundled dependencies
+  - [ ] Test on clean Windows systems without Python
+  - [ ] Create builds for Mac and Linux
+  - **Status**: Windows build fully functional, other platforms untested
+
+- [ ] **Package for distribution**
   - [ ] Create PyPI package
   - [ ] Add `setup.py` and proper package structure
   - [ ] Include pre-built binaries for common platforms
-- [x] Create standalone executables
-  - [x] Use PyInstaller for Windows/Mac/Linux
-  - [ ] Test on clean systems without Python
-- [ ] Add Docker support
+  - **Estimated effort**: 6-8 hours
+
+- [ ] **Add Docker support**
   - [ ] Create Dockerfile for containerized usage
   - [ ] Publish to Docker Hub
   - [ ] Document Docker usage
-- [ ] Improve documentation
+  - **Estimated effort**: 3-4 hours
+
+- [ ] **Improve documentation**
+  - [x] Comprehensive README.md with examples
+  - [x] Development guide (CLAUDE.md) with roadmap
   - [ ] Add video tutorials/demos
   - [ ] Create comprehensive user guide
   - [ ] Document all codec options by platform
@@ -392,11 +489,14 @@ else:
 
 ## Known Limitations
 
-1. **Single-threaded** - Processes images sequentially (parallel processing planned for Phase 4)
+1. **Single-threaded** - Processes images sequentially (parallel processing planned for Phase 3)
 2. **Limited codec testing** - Codec validation may miss some edge cases on different systems
-3. **Monolithic structure** - Single file makes it harder to unit test (refactoring planned for Phase 3)
+3. **Monolithic structure** - Single 956-line file (refactoring planned only if needed in Phase 4)
 4. **No audio support** - Only generates video without audio tracks (planned for Phase 2)
-5. **Basic zoom only** - No pan effects or combined movements (planned for Phase 2)
+5. **Basic zoom only** - No pan effects or combined movements yet (planned for Phase 2)
+6. **No transition effects** - Stitched videos are concatenated without transitions (planned for Phase 2)
+7. **No configuration file** - Must specify settings via CLI arguments each time (planned for Phase 2)
+8. **Alphabetical stitching order** - Videos are combined alphabetically, no custom ordering (planned for Phase 5)
 
 ## Git Commit Conventions
 

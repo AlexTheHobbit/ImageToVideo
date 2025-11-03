@@ -8,10 +8,13 @@ Convert still images into videos with a cinematic Ken Burns zoom effect. Perfect
 - **Flexible Output**: Support for multiple video codecs and formats (MXF, MP4, AVI, etc.)
 - **Customizable Settings**: Control resolution, frame rate, duration, zoom speed, and blur
 - **Batch Processing**: Process multiple images in one command
+- **Video Stitching**: Combine multiple videos into a single slideshow file
 - **Smart Scaling**: Automatically handles various aspect ratios with intelligent cropping
 - **Blurred Background**: Fills letterbox areas with an artistic blurred version of the image
 - **Fast Performance**: Powered by OpenCV with optimized image processing
+- **Portable Executable**: Build standalone .exe with no Python installation required
 - **Command-Line Interface**: Easy to use with sensible defaults
+- **Comprehensive Testing**: 103 automated tests with 84%+ code coverage
 
 ## Installation
 
@@ -43,6 +46,32 @@ python imgToVideo.py [options]
 - Python 3.8 or higher
 - opencv-python 4.6.0.66
 - numpy < 2.0 (for compatibility)
+
+### Portable Executable (Windows)
+
+Build a standalone .exe that works without Python installation:
+
+```bash
+# Install PyInstaller (included in dev dependencies)
+uv sync --no-install-project
+
+# Build the executable
+uv run pyinstaller --onefile --name imgToVideo imgToVideo.py
+
+# The executable will be at: dist/imgToVideo.exe (~52MB)
+```
+
+**Using the executable**:
+
+```bash
+# Use just like the Python script
+.\dist\imgToVideo.exe -i ./photos -o ./videos --codec mp4v --extension mp4
+
+# Show help
+.\dist\imgToVideo.exe --help
+```
+
+The portable .exe bundles Python and all dependencies, making it easy to distribute and run on systems without Python installed.
 
 ## Quick Start
 
@@ -115,6 +144,16 @@ uv run python imgToVideo.py --zoom 0.0006 --blur 201
 | `xvid` | `avi` | Xvid codec, good compression |
 | `xdv7` | `mxf` | Professional MXF format (default) |
 
+### Processing Options
+
+| Option | Description |
+|--------|-------------|
+| `--stitch` | Combine all output videos into a single file (slideshow mode) |
+| `--force` | Overwrite existing output files instead of skipping them |
+| `--dry-run` | Preview processing plan without creating videos |
+| `--verbose` | Show detailed debug output during processing |
+| `--quiet` | Suppress all output except errors |
+
 ## Supported Image Formats
 
 - JPEG (`.jpg`, `.jpeg`)
@@ -176,6 +215,38 @@ uv run python imgToVideo.py --zoom 0.0002 --duration 20 --blur 255
 
 ```bash
 uv run python imgToVideo.py --zoom 0.0008 --duration 5 --blur 151
+```
+
+### Creating Slideshows with Video Stitching
+
+Combine multiple images into a single continuous video:
+
+```bash
+# Create individual videos from all images, then combine them
+uv run python imgToVideo.py -i ./vacation_photos -o ./output --duration 5 --stitch
+
+# Result: One video per image + one combined "slideshow_combined.mp4" with all videos stitched together
+```
+
+Example use cases:
+- **Photo albums**: Combine vacation photos into a single video
+- **Presentations**: Stitch multiple slides into one continuous presentation
+- **Time-lapse stories**: Merge sequential images with smooth transitions
+- **Social media**: Create multi-image posts as a single video
+
+### Dry Run Mode
+
+Preview what will be processed without creating any videos:
+
+```bash
+# See what would be created
+uv run python imgToVideo.py -i ./photos --dry-run
+
+# Output shows plan:
+# - Which images will be processed
+# - Expected output filenames
+# - Total disk space needed
+# - Processing time estimate
 ```
 
 ## Output
@@ -332,12 +403,16 @@ Image to Video Converter/
 
 See [CLAUDE.md](CLAUDE.md) for development guide and planned improvements roadmap.
 
-### Current Version: 1.0.0
+### Current Version: 1.1.0
 
 **Recent Updates**:
-- ✓ Comprehensive command-line argument support
+- ✓ **Video stitching feature** - Combine multiple videos into slideshows
+- ✓ **Portable executable builds** - Create standalone .exe with PyInstaller
+- ✓ **Comprehensive test suite** - 103 automated tests, 84%+ coverage
+- ✓ **Dry-run mode** - Preview processing without creating files
+- ✓ **Force and resume modes** - Better control over batch processing
+- ✓ **Verbose and quiet modes** - Flexible output logging
 - ✓ Adaptive interpolation for better quality
-- ✓ Robust error handling and validation
 - ✓ Migrated to uv for package management
 
 ## Technical Details

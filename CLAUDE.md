@@ -4,7 +4,15 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**ImageToVideo** - A single-file Python CLI tool that creates videos from static images using the Ken Burns zoom effect. Built with OpenCV for image processing and video encoding. Distributed as a
+**Image to Video Converter** - A single-file Python CLI tool (~1,290 lines) that creates videos from static images using the Ken Burns zoom effect. Built with OpenCV for image processing and video encoding.
+
+**Key Stats**:
+- 119 automated tests with 88.6% code coverage
+- Supports parallel processing with multiprocessing
+- Configuration file support (.imgtovideorc, YAML)
+- Video stitching to combine multiple outputs
+- Portable executable builds via PyInstaller
+- Automated releases with GitHub Actions
 
 ## Development Setup
 
@@ -42,7 +50,9 @@ uv run pytest tests/ --cov=imgToVideo --cov-report=html
 uv run pytest tests/ -v -k "not slow"
 ```
 
-### Building Standalone Executable
+### Building Locally (Optional)
+Releases are built automatically via GitHub Actions, but you can build locally for testing:
+
 ```bash
 # Build portable .exe (~52MB)
 uv run pyinstaller --onefile --name imgToVideo imgToVideo.py
@@ -50,6 +60,8 @@ uv run pyinstaller --onefile --name imgToVideo imgToVideo.py
 # Output: dist/imgToVideo.exe
 # Usage: .\dist\imgToVideo.exe -i ./photos -o ./videos
 ```
+
+**Note**: Use GitHub Actions for official releases (see Release Process section below).
 
 ## Architecture
 
@@ -177,6 +189,8 @@ else:
 
 ## Git Commit Conventions
 
+### Commit Message Format
+
 Follow this pattern:
 - Descriptive first line summarizing the change
 - Blank line
@@ -198,6 +212,122 @@ Features:
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+### Version Number Management
+
+**IMPORTANT**: Always update the version number when making changes. The version increment depends on the type of change.
+
+#### Semantic Versioning Rules
+
+Format: `vMAJOR.MINOR.PATCH` (e.g., `v1.2.3`)
+
+**MAJOR version** (`v2.0.0`) - Breaking changes:
+- Changes that break backward compatibility
+- Removal of features or command-line arguments
+- Changes to output format or file structure
+- API changes that require user code updates
+- **Examples**: Removing `--codec` flag, changing config file format incompatibly
+
+**MINOR version** (`v1.1.0`) - New features:
+- New features that don't break existing functionality
+- New command-line arguments or options
+- Performance improvements (2x or more)
+- New major capabilities (parallel processing, video stitching, etc.)
+- **Examples**: Adding `--jobs` flag, implementing config file support, adding pan effects
+
+**PATCH version** (`v1.0.1`) - Bug fixes:
+- Bug fixes and minor improvements
+- Documentation updates
+- Refactoring without behavior changes
+- Small performance optimizations (<50%)
+- Error message improvements
+- **Examples**: Fixing codec validation bug, correcting typos, improving error messages
+
+#### Version Update Workflow
+
+**Every commit should include a version consideration**:
+
+```bash
+# 1. Make your changes
+# ... edit files ...
+
+# 2. Determine version increment
+# - Breaking change? → MAJOR
+# - New feature? → MINOR
+# - Bug fix or minor improvement? → PATCH
+
+# 3. Commit changes (don't tag yet)
+git add .
+git commit -m "Add pan effects feature
+
+Implement horizontal and vertical pan directions alongside zoom.
+
+Features:
+- --pan-direction flag (left, right, up, down)
+- Combined zoom + pan support
+- Random pan option
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+Co-Authored-By: Claude <noreply@anthropic.com>
+"
+
+# 4. Push to main/branch
+git push
+
+# 5. When ready to release, create and push tag
+git tag v1.1.0  # Minor version bump for new feature
+git push origin v1.1.0
+```
+
+#### Quick Version Decision Guide
+
+Ask yourself:
+1. **Did I break anything?** → MAJOR (v2.0.0)
+2. **Did I add something new?** → MINOR (v1.1.0)
+3. **Did I fix or improve existing functionality?** → PATCH (v1.0.1)
+
+#### Special Cases
+
+- **Multiple changes in one commit**: Use the highest applicable version increment
+  - Bug fix + new feature → MINOR
+  - New feature + breaking change → MAJOR
+
+- **Work-in-progress**: Don't tag until ready for release
+  - Make commits normally without tags
+  - Create version tag only when ready to publish
+
+- **Hotfixes**:
+  - Branch from last release tag
+  - Fix bug
+  - Increment PATCH version
+  - Example: `v1.2.3` → `v1.2.4`
+
+#### Version Tracking
+
+Current version can be tracked in:
+- Git tags (source of truth)
+- README.md (update manually in commit)
+- Optionally: Add `__version__ = "1.0.0"` to imgToVideo.py
+
+**Template for version-aware commits**:
+```bash
+# Bug fix example
+git commit -m "Fix codec validation for edge cases
+
+Resolves issue where some codecs passed validation but failed encoding.
+
+Changes:
+- Increase minimum file size check to 100 bytes
+- Add stderr capture for OpenCV warnings
+
+Fixes #123
+
+Version: 1.0.1 (patch - bug fix)
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+Co-Authored-By: Claude <noreply@anthropic.com>
+"
 ```
 
 ## Testing
@@ -224,3 +354,64 @@ The project has 119 automated tests with 88.6% code coverage:
 2. Check coverage: `uv run pytest tests/ --cov=imgToVideo --cov-report=html`
 3. Verify coverage ≥85%
 4. Update README.md if user-facing changes
+
+## Release Process
+
+Releases are fully automated via GitHub Actions (`.github/workflows/release.yml`).
+
+### Creating a New Release
+
+```bash
+# 1. Ensure all tests pass locally
+uv run pytest tests/ -v
+
+# 2. Commit all changes
+git add .
+git commit -m "Prepare release v1.0.0"
+git push
+
+# 3. Create and push a version tag
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+### What Happens Automatically
+
+When you push a version tag (format: `v*`), GitHub Actions will:
+
+1. **Test Job** (Ubuntu)
+   - Run full pytest suite with coverage
+   - Must pass before building
+
+2. **Build Job** (Windows)
+   - Build `imgToVideo-v1.0.0-windows.exe` with PyInstaller
+   - Generate SHA256 checksums for verification
+   - Upload artifacts (retained 7 days)
+
+3. **Release Job** (Ubuntu, tags only)
+   - Create GitHub release with auto-generated notes
+   - Upload .exe and checksums
+   - Include documentation links
+
+### Manual Workflow Trigger
+
+You can also trigger builds manually without creating a release:
+- Go to Actions tab on GitHub
+- Select "Build and Release" workflow
+- Click "Run workflow"
+
+### Version Naming
+
+Use semantic versioning:
+- `v1.0.0` - Major release
+- `v1.1.0` - Minor release (new features)
+- `v1.0.1` - Patch release (bug fixes)
+
+### Release Assets
+
+Each release includes:
+- `imgToVideo-{version}-windows.exe` - Portable Windows executable (~52MB)
+- `SHA256SUMS.txt` - Checksums for integrity verification
+- Auto-generated release notes with features and links
+
+See `.github/RELEASE.md` for detailed release documentation.

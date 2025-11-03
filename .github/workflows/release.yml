@@ -1,0 +1,168 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0, v1.2.3, etc.
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: |
+          uv sync --no-install-project
+
+      - name: Run tests
+        run: |
+          uv run pytest tests/ -v --cov=imgToVideo --cov-report=term-missing
+
+  build-windows:
+    name: Build Windows Executable
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: |
+          uv sync --no-install-project
+
+      - name: Build executable with PyInstaller
+        run: |
+          uv run pyinstaller --onefile --name imgToVideo imgToVideo.py
+
+      - name: Get version from tag
+        id: get_version
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Rename executable with version
+        shell: bash
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          mv dist/imgToVideo.exe "dist/imgToVideo-${VERSION}-windows.exe"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: imgToVideo-windows
+          path: dist/imgToVideo-*.exe
+          retention-days: 7
+
+      - name: Calculate SHA256
+        id: sha256
+        shell: bash
+        run: |
+          cd dist
+          sha256sum imgToVideo-*.exe > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: dist/SHA256SUMS.txt
+          retention-days: 7
+
+  release:
+    name: Create GitHub Release
+    needs: build-windows
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Windows executable
+        uses: actions/download-artifact@v4
+        with:
+          name: imgToVideo-windows
+          path: artifacts
+
+      - name: Download checksums
+        uses: actions/download-artifact@v4
+        with:
+          name: checksums
+          path: artifacts
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md <<EOF
+          ## Image to Video Converter ${{ steps.get_version.outputs.version }}
+
+          ### Features
+          - Ken Burns zoom effect for static images
+          - Parallel processing with \`--jobs\` flag
+          - Configuration file support (.imgtovideorc, YAML)
+          - Video stitching to combine multiple outputs
+          - Comprehensive test suite (119 tests, 88.6% coverage)
+
+          ### Downloads
+          - **Windows**: \`imgToVideo-${{ steps.get_version.outputs.version }}-windows.exe\`
+          - Portable executable (~52MB) - no Python installation required
+
+          ### Installation
+          Download the executable and run it from the command line:
+          \`\`\`bash
+          imgToVideo-${{ steps.get_version.outputs.version }}-windows.exe -i ./photos -o ./videos
+          \`\`\`
+
+          ### Verify Download
+          Check SHA256 checksums in \`SHA256SUMS.txt\` to verify file integrity.
+
+          ### Documentation
+          - [README.md](https://github.com/${{ github.repository }}/blob/${{ steps.get_version.outputs.version }}/README.md)
+          - [CLAUDE.md](https://github.com/${{ github.repository }}/blob/${{ steps.get_version.outputs.version }}/CLAUDE.md)
+
+          ### Requirements
+          - Windows 10 or later
+          - No additional dependencies required
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.get_version.outputs.version }}
+          body_path: release_notes.md
+          files: |
+            artifacts/imgToVideo-*.exe
+            artifacts/SHA256SUMS.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

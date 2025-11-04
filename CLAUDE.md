@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**Image to Video Converter** - A single-file Python CLI tool (1,291 lines) that creates videos from static images using the Ken Burns zoom effect. Built with OpenCV for image processing and video encoding.
+**ImageToVideo** - A single-file Python CLI tool (1,291 lines) that creates videos from static images using the Ken Burns zoom effect. Built with OpenCV for image processing and video encoding.
 
 **Key Stats**:
 - 119 automated tests (8 test files) with 88.6% code coverage
@@ -103,16 +103,6 @@ iterator = items if args.quiet else tqdm(items, desc="...", unit="item")
 ### Commit Message Format
 
 Pattern: Descriptive summary → blank line → detailed explanation → Claude Code attribution
-
-```
-Add comprehensive progress indicators with tqdm
-
-Implement real-time progress tracking for both individual image
-processing and batch operations.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-Co-Authored-By: Claude <noreply@anthropic.com>
-```
 
 ### Version Number Management
 

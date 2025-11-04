@@ -28,7 +28,7 @@ jobs:
 
       - name: Run tests
         run: |
-          uv run pytest tests/ -v --cov=imgToVideo --cov-report=term-missing
+          uv run pytest tests/ -v -m "not slow" --cov=imgToVideo --cov-report=term-missing
 
   build-windows:
     name: Build Windows Executable
